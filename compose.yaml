@@ -1,0 +1,58 @@
+name: personal-notion
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runner
+    image: personal-notion:local
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    env_file:
+      - .env.docker
+    environment:
+      NODE_ENV: production
+      HOSTNAME: 0.0.0.0
+      PORT: 3000
+      AUTH_TRUST_HOST: "true"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 25s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+      - /app/.next/cache:size=256m,uid=1000,gid=1000,mode=1777
+    networks:
+      - hub
+
+  migrate:
+    profiles: ["migrate"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: migrate
+    image: personal-notion:migrate
+    env_file:
+      - .env.docker
+    environment:
+      NODE_ENV: production
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    networks:
+      - hub
+    restart: "no"
+
+networks:
+  hub:
+    driver: bridge

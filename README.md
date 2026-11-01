@@ -1,36 +1,58 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Personal Notion (DevHub)
 
-## Getting Started
+Distraction-free personal tech hub: auth-gated modules, Video Vault, News Radar, and BYOK Gemini summaries.
 
-First, run the development server:
+Stack: **Next.js 16** (App Router, Cache Components), **React 19**, **Auth.js**, **Drizzle + Neon**, **Tailwind v4**, **pnpm**.
+
+## Local development
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
+pnpm install
+cp .env.example .env.local
+# fill DATABASE_URL, AUTH_SECRET, Google OAuth, AUTH_ADMIN_EMAIL
+pnpm db:migrate
 pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Scripts: `pnpm lint`, `pnpm typecheck`, `pnpm build`, `pnpm db:studio`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Google OAuth redirect: `{AUTH_URL}/api/auth/callback/google`.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Docker
 
-## Learn More
+Multi-stage image (`standalone` output), non-root user, read-only rootfs, healthcheck on `/api/health`.
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+cp .env.docker.example .env.docker
+# fill secrets in .env.docker
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+pnpm docker:migrate   # apply Drizzle migrations
+pnpm docker:up        # build + run app on :3000
+pnpm docker:down
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Or:
 
-## Deploy on Vercel
+```bash
+docker build -t personal-notion:local .
+docker compose up --build -d
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Runtime secrets are injected via `.env.docker` — they are **not** baked into the image.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## CI / CD
+
+| Workflow | Purpose |
+| --- | --- |
+| `CI` | lint, typecheck, production build |
+| `Docker` | build image, Trivy scan, push to `ghcr.io/<owner>/<repo>` on `main` / tags |
+| `Security` | Gitleaks, `pnpm audit`, CodeQL |
+| Dependabot | weekly npm, Actions, and Docker base updates |
+
+GHCR packages are private to the repo by default; grant `read:packages` to pull on a host.
+
+## Security
+
+See [SECURITY.md](./SECURITY.md) for the control matrix, secret handling, and deploy checklist.
+
+Production boot validates required env vars (`src/instrumentation.ts`). CSP, HSTS, frame denial, and Server Action origin checks are enabled in `next.config.ts` / `src/proxy.ts`.

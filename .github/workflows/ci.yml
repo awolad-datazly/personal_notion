@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Lint · Typecheck · Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12.16.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: ESLint
+        run: pnpm lint
+
+      - name: TypeScript
+        run: pnpm typecheck
+
+      - name: Production build
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+          SKIP_ENV_VALIDATION: "1"
+          AUTH_SECRET: ci-build-placeholder-secret-32chars
+          DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/ci
+          AUTH_GOOGLE_ID: ci
+          AUTH_GOOGLE_SECRET: ci
+          AUTH_ADMIN_EMAIL: ci@example.com
+          AUTH_URL: http://localhost:3000
+          ALLOWED_ORIGINS: http://localhost:3000
+        run: pnpm build
