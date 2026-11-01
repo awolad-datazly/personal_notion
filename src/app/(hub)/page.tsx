@@ -1,3 +1,4 @@
+import { DevMemeCard } from "@/components/dashboard/dev-meme-card";
 import { RaycastOmniBar } from "@/components/dashboard/raycast-omni-bar";
 import { ScratchpadPanel } from "@/components/dashboard/scratchpad-panel";
 import { StudyVaultCompact } from "@/components/dashboard/study-vault-compact";
@@ -16,10 +17,11 @@ export default function Home() {
           <TechSignalTable />
         </section>
 
-        {/* Right 5 Columns: Continue Studying & Quick Markdown Scratchpad */}
+        {/* Right 5 Columns: Continue Studying, Quick Scratchpad & Dev Memes */}
         <section className="flex flex-col gap-6 lg:col-span-5">
           <StudyVaultCompact />
           <ScratchpadPanel />
+          <DevMemeCard />
         </section>
       </div>
     </main>

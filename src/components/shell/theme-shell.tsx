@@ -12,6 +12,7 @@ import { SupportWidget } from "@/components/support/support-widget";
 import { CommandPalette } from "@/components/shell/command-palette";
 import { ToastContainer } from "@/components/ui/toast";
 import { ArticleReaderDrawer } from "@/components/reader/article-reader-drawer";
+import { DevStatusFooter } from "@/components/shell/dev-status-footer";
 import { auth } from "@/auth";
 
 async function ShellChrome({ children }: { children: React.ReactNode }) {
@@ -41,15 +42,7 @@ async function ShellChrome({ children }: { children: React.ReactNode }) {
           <SidebarNav items={items} />
         </div>
 
-        <div className="border-t border-zinc-800/80 px-4 py-3">
-          <div className="flex items-center justify-between text-xs font-mono text-zinc-400">
-            <span>Workspace</span>
-            <span className="flex items-center gap-1.5 text-zinc-300">
-              <span className="size-2 rounded-full bg-emerald-500" />
-              Ready
-            </span>
-          </div>
-        </div>
+        <DevStatusFooter />
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">

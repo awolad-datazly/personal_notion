@@ -35,16 +35,28 @@ export function SidebarNav({
             </div>
             {sectionItems.map((item) => {
               const Icon = NAV_ICONS[item.icon];
+              const isHash = item.href.includes("#");
               const active =
                 item.href === "/"
                   ? pathname === "/"
-                  : pathname === item.href || (item.href !== "/#scratchpad" && pathname.startsWith(`${item.href}/`));
+                  : !isHash && (pathname === item.href || pathname.startsWith(`${item.href}/`));
 
               return (
                 <Link
                   key={item.href}
                   href={item.href}
-                  onClick={onNavigate}
+                  onClick={() => {
+                    onNavigate?.();
+                    if (isHash) {
+                      const id = item.href.split("#")[1];
+                      if (id) {
+                        setTimeout(() => {
+                          const el = document.getElementById(id);
+                          el?.scrollIntoView({ behavior: "smooth" });
+                        }, 50);
+                      }
+                    }
+                  }}
                   className={cn(
                     "group flex h-9 items-center gap-2.5 rounded-md px-3 text-sm font-medium transition-colors",
                     active

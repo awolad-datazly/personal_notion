@@ -68,7 +68,7 @@ export function SummarizeButton({
         className="flex h-9 items-center gap-2 rounded-md border border-zinc-700/70 bg-zinc-800/90 px-3.5 text-sm font-medium text-zinc-100 transition-colors hover:bg-zinc-700 hover:text-white disabled:opacity-50 shadow-xs"
       >
         <Terminal className="size-4 text-zinc-400" />
-        <span>{isPending ? "Indexing TL;DR…" : "TL;DR Digest"}</span>
+        <span>{isPending ? "Asking AI to read docs…" : "TL;DR Digest"}</span>
       </button>
       {isPending ? <Skeleton className="h-16 w-full rounded-md bg-zinc-800/40" /> : null}
       {error ? <p className="font-mono text-xs text-red-400">{error}</p> : null}

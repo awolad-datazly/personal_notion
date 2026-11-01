@@ -9,6 +9,7 @@ export type NavIconName =
   | "articles"
   | "bookmarks"
   | "scratchpad"
+  | "coffee"
   | "settings"
   | "admin";
 
@@ -72,6 +73,13 @@ export const PRIMARY_NAV: readonly NavItem[] = [
     icon: "scratchpad",
     section: "LIBRARY",
     shortcut: "N",
+  },
+  {
+    href: "/#coffee-break",
+    label: "Coffee Break",
+    icon: "coffee",
+    section: "LIBRARY",
+    shortcut: "M",
   },
 
   // SYSTEM

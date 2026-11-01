@@ -68,9 +68,12 @@ export function SupportWidget() {
       </DialogTrigger>
       <DialogContent className="sm:max-w-sm" showCloseButton>
         <DialogHeader>
-          <DialogTitle>Support the hub</DialogTitle>
-          <DialogDescription>
-            Send {amount} BDT with bKash. Scan the QR or copy the number below.
+          <DialogTitle className="flex items-center gap-2">
+            <span>Fuel the Dev Engine</span>
+            <span className="text-amber-400">☕</span>
+          </DialogTitle>
+          <DialogDescription className="text-xs leading-relaxed text-zinc-300">
+            {amount}৳ = 1 cup of Tong-er Cha to keep this server alive and bug-free. Scan with bKash or copy the personal number below.
           </DialogDescription>
         </DialogHeader>
 

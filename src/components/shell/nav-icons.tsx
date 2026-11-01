@@ -2,6 +2,7 @@ import {
   Bookmark,
   BookOpenText,
   Clapperboard,
+  Coffee,
   LayoutDashboard,
   Newspaper,
   PenLine,
@@ -19,6 +20,7 @@ export const NAV_ICONS: Record<NavIconName, LucideIcon> = {
   articles: BookOpenText,
   bookmarks: Bookmark,
   scratchpad: PenLine,
+  coffee: Coffee,
   settings: Settings,
   admin: Shield,
 };

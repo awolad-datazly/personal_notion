@@ -121,7 +121,7 @@ export function RaycastOmniBar() {
             disabled={isPending}
             className="flex h-9 items-center gap-1.5 rounded-md bg-zinc-100 px-4 text-sm font-medium text-zinc-950 transition-colors hover:bg-white disabled:opacity-50"
           >
-            <span>{isPending ? "Loading…" : "Open"}</span>
+            <span>{isPending ? "Resolving reality…" : "Open"}</span>
             <ArrowRight className="size-4" />
           </button>
         </div>

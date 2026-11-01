@@ -190,11 +190,15 @@ export function TechSignalTable() {
             type="button"
             onClick={() => fetchSignals(true)}
             disabled={loading}
-            className="flex h-7 items-center gap-1 rounded-md border border-zinc-800 bg-zinc-900/80 px-2 text-xs font-mono text-zinc-400 hover:text-white hover:border-zinc-700 transition-colors disabled:opacity-50 active:scale-[0.98]"
+            className="flex h-7 items-center gap-1.5 rounded-md border border-zinc-800 bg-zinc-900/80 px-2.5 text-xs font-mono text-zinc-400 hover:text-white hover:border-zinc-700 transition-colors disabled:opacity-50 active:scale-[0.98]"
             title="Refresh feed"
           >
             <RefreshCw className={`size-3 ${loading ? "animate-spin text-zinc-200" : ""}`} />
-            <span className="hidden sm:inline">{loading ? "Fetching…" : "Refresh"}</span>
+            <span className="hidden sm:inline">
+              {loading
+                ? "Fetching signals… avoiding node_modules…"
+                : "Refresh"}
+            </span>
           </button>
         </div>
 

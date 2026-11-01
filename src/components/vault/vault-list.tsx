@@ -11,10 +11,12 @@ import { youtubeThumbnailUrl } from "@/lib/youtube";
 export function VaultList({ items }: { items: VaultItem[] }) {
   if (items.length === 0) {
     return (
-      <div className="rounded-lg border border-dashed border-zinc-800 p-8 text-center">
-        <p className="font-mono text-sm font-medium text-zinc-200">Vault is empty</p>
-        <p className="mt-1.5 font-mono text-xs text-zinc-400">
-          Paste a YouTube link in the input bar above to begin a session.
+      <div className="rounded-lg border border-dashed border-zinc-800 p-12 text-center space-y-2">
+        <p className="font-mono text-sm font-semibold text-zinc-200">
+          Nothing saved in the vault yet. Either you already know everything, or you&apos;re procrastinating.
+        </p>
+        <p className="font-mono text-xs text-zinc-400">
+          Paste a YouTube tutorial or engineering talk in the input bar above to begin a session.
         </p>
       </div>
     );

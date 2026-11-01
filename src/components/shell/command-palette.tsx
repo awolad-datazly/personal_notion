@@ -3,7 +3,9 @@
 import {
   BookOpen,
   Bookmark,
+  Coffee,
   FileText,
+  Flame,
   KeyRound,
   LayoutDashboard,
   Newspaper,
@@ -19,6 +21,31 @@ import { toast } from "@/components/ui/toast";
 
 export function openCommandPalette() {
   window.dispatchEvent(new CustomEvent("devpulse.open-command-palette"));
+}
+
+const DEV_EXCUSES = [
+  "I wasn't slacking, my Docker container was rebuilding.",
+  "It's not a bug, it's an undocumented feature flag.",
+  "DNS propagation is taking up to 48 hours.",
+  "That code was written on a Friday at 4:59 PM.",
+  "The legacy codebase is sentient and actively rejecting my PR.",
+  "It works on my machine, so we should just ship my laptop to prod.",
+  "Centering a div took longer than implementing Raft consensus.",
+  "Waiting for node_modules to finish downloading the observable universe.",
+  "The bug only reproduces when the client is screen sharing.",
+  "I didn't break production, I just stress-tested our rollback strategy.",
+  "Currently benchmarking whether tabs or spaces save more battery life.",
+  "It's a race condition between my caffeine intake and the V8 garbage collector.",
+  "Refactoring 10,000 lines of code to remove a single console.log.",
+  "The requirements changed between morning standup and right now.",
+  "I wasn't procrastinating, I was compiling mental ASTs in my head.",
+  "My tests passed locally because I commented out the assertions.",
+  "Stack Overflow was down for 4 minutes so all engineering halted.",
+  "Technical debt isn't real if you ignore the Jira backlog.",
+];
+
+function getRandomExcuse() {
+  return DEV_EXCUSES[Math.floor(Math.random() * DEV_EXCUSES.length)];
 }
 
 export function CommandPalette() {
@@ -150,6 +177,30 @@ export function CommandPalette() {
         } else {
           toast.info("Scratchpad is empty");
         }
+      },
+    },
+    {
+      id: "nav-coffee-break",
+      label: "Take a Coffee Break (Dev Memes)",
+      category: "Dev Humor",
+      shortcut: "M",
+      icon: Coffee,
+      action: () => {
+        router.push("/#coffee-break");
+        setTimeout(() => {
+          const el = document.getElementById("coffee-break");
+          el?.scrollIntoView({ behavior: "smooth" });
+        }, 50);
+      },
+    },
+    {
+      id: "action-excuse-generator",
+      label: "Generate Daily Standup Excuse / Dev Roast",
+      category: "Dev Humor",
+      shortcut: "E",
+      icon: Flame,
+      action: () => {
+        toast.info(`"${getRandomExcuse()}"`);
       },
     },
   ];
