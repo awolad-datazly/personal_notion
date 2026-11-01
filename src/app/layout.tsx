@@ -26,6 +26,7 @@ const sourceSerif = Source_Serif_4({
 export const metadata: Metadata = {
   title: "Personal Notion",
   description: "A distraction-free personal tech hub and knowledge base.",
+  referrer: "no-referrer-when-downgrade",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

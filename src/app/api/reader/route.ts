@@ -128,7 +128,13 @@ function resolveGitHubHtml(
     'src="https://raw.githubusercontent.com/$1/$2/$3"'
   );
 
-  // 4. Rewrite relative image src (src="(?!https?:\/\/|data:)([^"]+)")
+  // 4. Prefer data-canonical-src for camo images when available
+  html = html.replace(
+    /<img\b([^>]*?)\bsrc=["']https:\/\/camo\.githubusercontent\.com\/[^"']+["']([^>]*?)\bdata-canonical-src=["']([^"']+)["']([^>]*)>/gi,
+    '<img$1src="$3"$2$4>'
+  );
+
+  // 5. Rewrite relative image src (src="(?!https?:\/\/|data:)([^"]+)")
   html = html.replace(
     /(<img\b[^>]*?\bsrc=["'])(?!https?:\/\/|data:)([^"']+)(["'][^>]*>)/gi,
     (full, prefix, srcVal, suffix) => {
@@ -138,7 +144,10 @@ function resolveGitHubHtml(
     }
   );
 
-  // 5. Rewrite relative link hrefs
+  // 6. Add referrerpolicy="no-referrer" to all images
+  html = html.replace(/<img\b(?![^>]*\breferrerpolicy=)([^>]*?)>/gi, '<img referrerpolicy="no-referrer" loading="lazy" $1>');
+
+  // 7. Rewrite relative link hrefs
   html = html.replace(
     /(<a\b[^>]*?\bhref=["'])(?!https?:\/\/|mailto:|#|javascript:)([^"']+)(["'][^>]*>)/gi,
     (full, prefix, hrefVal, suffix) => {
@@ -649,6 +658,9 @@ export async function GET(request: Request) {
       return inner.replace(/<source\b[^>]*\/?>/gi, "");
     });
     cleanHtml = cleanHtml.replace(/<source\b[^>]*\/?>/gi, "");
+
+    // Ensure all <img> tags have referrerpolicy="no-referrer"
+    cleanHtml = cleanHtml.replace(/<img\b(?![^>]*\breferrerpolicy=)([^>]*?)>/gi, '<img referrerpolicy="no-referrer" loading="lazy" $1>');
 
     const plainCharCount = cleanHtml.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().length;
 
