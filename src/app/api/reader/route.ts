@@ -21,6 +21,7 @@ export type ReaderResponse = {
   readTime: string;
   summary: string;
   content: string;
+  htmlContent: string;
   codeSnippets: string[];
   url: string;
   sourceType: "github" | "devto" | "hackernews" | "article";
@@ -112,44 +113,36 @@ function resolveGitHubHtml(
   repo: string,
   defaultBranch = "main"
 ): string {
-  // Strip all HTML comments
+  // 1. Strip all HTML comments
   let html = rawHtml.replace(/<!--[\s\S]*?-->/g, "");
 
-  // Rewrite relative image src and source srcset
+  // 2. Remove <picture> and <source> wrapper tags while keeping the inner <img ... /> tag intact
+  html = html.replace(/<picture\b[^>]*>([\s\S]*?)<\/picture>/gi, (match, inner) => {
+    return inner.replace(/<source\b[^>]*\/?>/gi, "");
+  });
+  html = html.replace(/<source\b[^>]*\/?>/gi, "");
+
+  // 3. Rewrite github.com blob URLs to raw.githubusercontent.com
   html = html.replace(
-    /(<(?:img|source)\b[^>]*?\b(?:src|srcset)=["'])([^"']+)(["'][^>]*>)/gi,
+    /src=["']https:\/\/github\.com\/([^/]+)\/([^/]+)\/blob\/([^"']+)["']/gi,
+    'src="https://raw.githubusercontent.com/$1/$2/$3"'
+  );
+
+  // 4. Rewrite relative image src (src="(?!https?:\/\/|data:)([^"]+)")
+  html = html.replace(
+    /(<img\b[^>]*?\bsrc=["'])(?!https?:\/\/|data:)([^"']+)(["'][^>]*>)/gi,
     (full, prefix, srcVal, suffix) => {
-      const trimmed = srcVal.trim();
-      if (
-        trimmed.startsWith("http://") ||
-        trimmed.startsWith("https://") ||
-        trimmed.startsWith("data:") ||
-        trimmed.startsWith("//")
-      ) {
-        return full;
-      }
-      const cleanPath = trimmed.replace(/^(\.\/|\/)+/, "");
+      const cleanPath = srcVal.replace(/^(\.\/|\/)+/, "");
       const resolved = `https://raw.githubusercontent.com/${owner}/${repo}/${defaultBranch}/${cleanPath}`;
       return `${prefix}${resolved}${suffix}`;
     }
   );
 
-  // Rewrite relative link hrefs
+  // 5. Rewrite relative link hrefs
   html = html.replace(
-    /(<a\b[^>]*?\bhref=["'])([^"']+)(["'][^>]*>)/gi,
+    /(<a\b[^>]*?\bhref=["'])(?!https?:\/\/|mailto:|#|javascript:)([^"']+)(["'][^>]*>)/gi,
     (full, prefix, hrefVal, suffix) => {
-      const trimmed = hrefVal.trim();
-      if (
-        trimmed.startsWith("http://") ||
-        trimmed.startsWith("https://") ||
-        trimmed.startsWith("mailto:") ||
-        trimmed.startsWith("#") ||
-        trimmed.startsWith("javascript:") ||
-        trimmed.startsWith("//")
-      ) {
-        return full;
-      }
-      const cleanPath = trimmed.replace(/^(\.\/|\/)+/, "");
+      const cleanPath = hrefVal.replace(/^(\.\/|\/)+/, "");
       const resolved = `https://github.com/${owner}/${repo}/blob/${defaultBranch}/${cleanPath}`;
       return `${prefix}${resolved}${suffix}`;
     }
@@ -179,7 +172,7 @@ async function handleGitHub(owner: string, repo: string, targetUrl: string): Pro
 
   const defaultBranch = repoData?.default_branch || "main";
 
-  // Fetch pre-rendered HTML README via GitHub API with Accept: application/vnd.github.html+json
+  // Fetch already pre-rendered HTML README via GitHub API with Accept: application/vnd.github.html+json
   let readmeHtml = "";
   try {
     const readmeRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/readme`, {
@@ -248,7 +241,7 @@ async function handleGitHub(owner: string, repo: string, targetUrl: string): Pro
     readmeHtml = `<h2>${owner}/${repo}</h2><p>${repoData?.description || "Technical GitHub repository."}</p><p><a href="https://github.com/${owner}/${repo}">Open repository on GitHub</a></p>`;
   }
 
-  // Resolve relative images and links, and strip HTML comments
+  // Resolve relative images and links, unwrap picture tags, and strip HTML comments
   readmeHtml = resolveGitHubHtml(readmeHtml, owner, repo, defaultBranch);
 
   // Extract code snippets from html
@@ -272,6 +265,7 @@ async function handleGitHub(owner: string, repo: string, targetUrl: string): Pro
     readTime,
     summary: cleanTitle(repoData?.description || `GitHub repository by ${owner}`),
     content: readmeHtml,
+    htmlContent: readmeHtml,
     codeSnippets,
     url: targetUrl,
     sourceType: "github",
@@ -316,7 +310,7 @@ async function handleDevTo(username: string, slug: string, targetUrl: string): P
     if (!rawContent) throw new Error("Empty Dev.to body content");
 
     const content = rawContent.replace(/<!--[\s\S]*?-->/g, "");
-    const contentType = article.body_html ? "html" : "markdown";
+    const contentType = "html";
 
     const codeSnippets: string[] = [];
     const codeRegex = /```(?:[a-z0-9_-]+)?\n([\s\S]*?)```/g;
@@ -334,6 +328,7 @@ async function handleDevTo(username: string, slug: string, targetUrl: string): P
       readTime: `${article.reading_time_minutes || 5} min read`,
       summary: cleanTitle(article.description || "Clean Dev.to technical article."),
       content,
+      htmlContent: content,
       codeSnippets,
       url: targetUrl,
       sourceType: "devto",
@@ -350,10 +345,11 @@ async function handleDevTo(username: string, slug: string, targetUrl: string): P
       readTime: "3 min read",
       summary: "Dev.to article could not be reached directly at this time (offline or host unreachable).",
       content: "",
+      htmlContent: "",
       codeSnippets: [],
       url: targetUrl,
       sourceType: "devto",
-      contentType: "markdown",
+      contentType: "html",
       isFallback: true,
       fallbackReason: "Could not resolve dev.to or network connection timed out.",
     });
@@ -376,12 +372,10 @@ function cleanHnText(text?: string): string {
   return decodeHtmlEntities(
     text
       .replace(/<!--[\s\S]*?-->/g, "")
-      .replace(/<p>/gi, "\n\n")
+      .replace(/<p>/gi, "<br/><br/>")
       .replace(/<\/p>/gi, "")
-      .replace(/<pre><code>([\s\S]*?)<\/code><\/pre>/gi, "\n```\n$1\n```\n")
-      .replace(/<i>([\s\S]*?)<\/i>/gi, "*$1*")
-      .replace(/<a\b[^>]*href=["']([^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi, "[$2]($1)")
-      .replace(/<[^>]+>/g, "")
+      .replace(/<pre><code>([\s\S]*?)<\/code><\/pre>/gi, "<pre><code>$1</code></pre>")
+      .replace(/<i>([\s\S]*?)<\/i>/gi, "<em>$1</em>")
   ).trim();
 }
 
@@ -420,42 +414,36 @@ async function handleHackerNews(id: string, targetUrl: string): Promise<NextResp
       (c) => c && !c.deleted && !c.dead && typeof c.text === "string" && c.text.trim().length > 0
     );
 
-    let markdown = "";
+    let htmlContent = `<div class="space-y-4">`;
     if (externalUrl) {
-      markdown += `🔗 **Original Article:** [${externalUrl}](${externalUrl})\n\n`;
+      htmlContent += `<p>🔗 <strong>Original Link:</strong> <a href="${externalUrl}" target="_blank" rel="noreferrer">${externalUrl}</a></p>`;
     }
-
     if (story.text) {
-      markdown += `### Submission Note\n\n${cleanHnText(story.text)}\n\n`;
+      htmlContent += `<div><h3 class="text-base font-semibold text-zinc-200 mt-4 mb-2">Submission Note</h3><div>${cleanHnText(story.text)}</div></div>`;
     }
-
     if (validComments.length > 0) {
-      markdown += `## Top Engineering Discussions\n\n`;
+      htmlContent += `<h2 class="text-lg font-semibold text-zinc-100 mt-6 mb-3 border-b border-zinc-800 pb-2">Top Engineering Discussions (${descendants} comments • ${score} points)</h2><div class="space-y-4">`;
       validComments.forEach((c) => {
-        const commentContent = cleanHnText(c.text);
-        const quoted = commentContent
-          .split("\n")
-          .map((line) => `> ${line}`)
-          .join("\n");
-        markdown += `> **@${c.by || "contributor"}**:\n${quoted}\n\n---\n\n`;
+        htmlContent += `<blockquote class="border-l-2 border-zinc-700 pl-4 py-1 italic my-3 text-zinc-300 bg-zinc-900/30 rounded-r"><strong class="text-zinc-200 not-italic">@${c.by || "contributor"}</strong>:<div class="mt-1">${cleanHnText(c.text)}</div></blockquote>`;
       });
+      htmlContent += `</div>`;
     } else {
-      markdown += `*No comments available yet on this discussion.*\n\n[Join discussion on Hacker News](https://news.ycombinator.com/item?id=${id})`;
+      htmlContent += `<p class="italic text-zinc-400">No comments yet on this discussion. <a href="https://news.ycombinator.com/item?id=${id}" target="_blank" rel="noreferrer">Open on Hacker News</a></p>`;
     }
-
-    markdown = markdown.replace(/<!--[\s\S]*?-->/g, "");
+    htmlContent += `</div>`;
 
     const payload: ReaderResponse = {
       title,
       author,
       domain: "news.ycombinator.com",
-      readTime: `${Math.max(1, Math.round(markdown.split(/\s+/).length / 200))} min read`,
+      readTime: "3 min read",
       summary: `Hacker News discussion with ${score} points and ${descendants} comments.`,
-      content: markdown,
+      content: htmlContent,
+      htmlContent,
       codeSnippets: [],
       url: targetUrl,
       sourceType: "hackernews",
-      contentType: "markdown",
+      contentType: "html",
       hnStats: {
         points: score,
         comments: descendants,
@@ -471,11 +459,12 @@ async function handleHackerNews(id: string, targetUrl: string): Promise<NextResp
       domain: "news.ycombinator.com",
       readTime: "2 min read",
       summary: "Hacker News engineering thread.",
-      content: `[Open Hacker News Discussion](https://news.ycombinator.com/item?id=${id})`,
+      content: "",
+      htmlContent: "",
       codeSnippets: [],
       url: targetUrl,
       sourceType: "hackernews",
-      contentType: "markdown",
+      contentType: "html",
       isFallback: true,
       fallbackReason: "Could not fetch Hacker News API live at this time.",
     });
@@ -535,10 +524,11 @@ export async function GET(request: Request) {
         readTime: "1 min read",
         summary: `Site responded with status ${res.status}.`,
         content: "",
+        htmlContent: "",
         codeSnippets: [],
         url: targetUrl,
         sourceType: "article",
-        contentType: "markdown",
+        contentType: "html",
         isFallback: true,
         fallbackReason: `HTTP status ${res.status}: Publisher blocks automated extraction.`,
       });
@@ -592,11 +582,11 @@ export async function GET(request: Request) {
       /<div\b[^>]*(?:class|id)=["'][^"']*(?:post-content|article-content|entry-content|article-body|prose|content__body|story-body)[^"']*["'][^>]*>([\s\S]*?)<\/div>/i
     );
 
-    if (articleMatch?.[1] && articleMatch[1].length > 300) {
+    if (articleMatch?.[1] && articleMatch[1].length > 200) {
       container = articleMatch[1];
-    } else if (mainMatch?.[1] && mainMatch[1].length > 300) {
+    } else if (mainMatch?.[1] && mainMatch[1].length > 200) {
       container = mainMatch[1];
-    } else if (contentDivMatch?.[1] && contentDivMatch[1].length > 300) {
+    } else if (contentDivMatch?.[1] && contentDivMatch[1].length > 200) {
       container = contentDivMatch[1];
     } else {
       const bodyMatch = html.match(/<body\b[^>]*>([\s\S]*?)<\/body>/i);
@@ -604,7 +594,7 @@ export async function GET(request: Request) {
     }
 
     // Strictly strip all noise elements
-    let cleaned = container
+    let cleanHtml = container
       .replace(/<!--[\s\S]*?-->/g, "")
       .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
       .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, "")
@@ -615,78 +605,52 @@ export async function GET(request: Request) {
       .replace(/<aside\b[^<]*(?:(?!<\/aside>)<[^<]*)*<\/aside>/gi, "")
       .replace(/<form\b[^<]*(?:(?!<\/form>)<[^<]*)*<\/form>/gi, "")
       .replace(/<button\b[^<]*(?:(?!<\/button>)<[^<]*)*<\/button>/gi, "")
-      .replace(/<svg\b[^<]*(?:(?!<\/svg>)<[^<]*)*<\/svg>/gi, "")
       .replace(/<dialog\b[^<]*(?:(?!<\/dialog>)<[^<]*)*<\/dialog>/gi, "")
       .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, "");
 
     // Strip alert/navigation/cookie roles & classes
-    cleaned = cleaned.replace(/<[a-z0-9]+[^>]*\brole=["'](?:alert|navigation|banner|dialog|status)["'][\s\S]*?<\/[a-z0-9]+>/gi, "");
-    cleaned = cleaned.replace(
+    cleanHtml = cleanHtml.replace(/<[a-z0-9]+[^>]*\brole=["'](?:alert|navigation|banner|dialog|status)["'][\s\S]*?<\/[a-z0-9]+>/gi, "");
+    cleanHtml = cleanHtml.replace(
       /<[a-z0-9]+[^>]*\b(?:class|id)=["'][^"']*(?:cookie-banner|cookie-notice|sidebar|advertisement|\bads?\b|social-share|newsletter-signup|auth-banner)[^"']*["'][\s\S]*?<\/[a-z0-9]+>/gi,
       ""
     );
 
-    // Extract structured blocks in document order
-    const blockRegex = /<(h[1-6]|p|pre|ul|ol|blockquote)[^>]*>([\s\S]*?)<\/\1>/gi;
-    const blocks: string[] = [];
-    const codeSnippets: string[] = [];
-
-    let match: RegExpExecArray | null;
-    while ((match = blockRegex.exec(cleaned)) !== null) {
-      const tag = match[1].toLowerCase();
-      const inner = match[2];
-
-      if (tag.startsWith("h")) {
-        const level = tag === "h1" ? "# " : tag === "h2" ? "## " : tag === "h3" ? "### " : "#### ";
-        const text = cleanTitle(inner);
-        if (text.length > 2 && text.length < 160) {
-          blocks.push(`${level}${text}`);
-        }
-      } else if (tag === "p") {
-        let pText = inner
-          .replace(/<code[^>]*>([\s\S]*?)<\/code>/gi, "`$1`")
-          .replace(/<a\b[^>]*href=["']([^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi, "[$2]($1)")
-          .replace(/<(?:strong|b)[^>]*>([\s\S]*?)<\/(?:strong|b)>/gi, "**$1**")
-          .replace(/<(?:em|i)[^>]*>([\s\S]*?)<\/(?:em|i)>/gi, "*$1*")
-          .replace(/<br\s*\/?>/gi, "\n")
-          .replace(/<[^>]+>/g, "");
-        pText = decodeHtmlEntities(pText).replace(/[ \t]+/g, " ").trim();
-        if (pText.length > 30) {
-          blocks.push(pText);
-        }
-      } else if (tag === "pre") {
-        let code = inner.replace(/<code[^>]*>([\s\S]*?)<\/code>/gi, "$1");
-        code = decodeHtmlEntities(code).trim();
-        if (code.length > 15) {
-          blocks.push("```\n" + code + "\n```");
-          if (codeSnippets.length < 3) {
-            codeSnippets.push(code);
-          }
-        }
-      } else if (tag === "ul" || tag === "ol") {
-        const liMatches = inner.match(/<li[^>]*>([\s\S]*?)<\/li>/gi);
-        if (liMatches && liMatches.length > 0) {
-          const items = liMatches
-            .map((li, idx) => {
-              const cleanLi = decodeHtmlEntities(li.replace(/<[^>]+>/g, "")).trim();
-              return cleanLi ? (tag === "ul" ? `- ${cleanLi}` : `${idx + 1}. ${cleanLi}`) : null;
-            })
-            .filter(Boolean);
-          if (items.length > 0) {
-            blocks.push(items.join("\n"));
-          }
-        }
-      } else if (tag === "blockquote") {
-        const qText = decodeHtmlEntities(inner.replace(/<[^>]+>/g, "")).trim();
-        if (qText.length > 10) {
-          blocks.push(`> ${qText}`);
+    // Convert relative <img src="..."> to absolute URLs using new URL(src, targetUrl).toString()
+    cleanHtml = cleanHtml.replace(
+      /(<img\b[^>]*?\bsrc=["'])([^"']+)(["'][^>]*>)/gi,
+      (full, prefix, srcVal, suffix) => {
+        try {
+          const absoluteSrc = new URL(srcVal, targetUrl).toString();
+          return `${prefix}${absoluteSrc}${suffix}`;
+        } catch {
+          return full;
         }
       }
-    }
+    );
 
-    let content = blocks.join("\n\n");
-    content = content.replace(/<!--[\s\S]*?-->/g, "");
-    const plainCharCount = content.replace(/[#*`>\[\]\(\)\n-]/g, "").trim().length;
+    // Convert relative <a href="..."> to absolute URLs
+    cleanHtml = cleanHtml.replace(
+      /(<a\b[^>]*?\bhref=["'])([^"']+)(["'][^>]*>)/gi,
+      (full, prefix, hrefVal, suffix) => {
+        if (hrefVal.startsWith("#") || hrefVal.startsWith("mailto:") || hrefVal.startsWith("javascript:")) {
+          return full;
+        }
+        try {
+          const absoluteHref = new URL(hrefVal, targetUrl).toString();
+          return `${prefix}${absoluteHref}${suffix}`;
+        } catch {
+          return full;
+        }
+      }
+    );
+
+    // Remove <picture> and <source> wrapper tags while keeping inner <img ... />
+    cleanHtml = cleanHtml.replace(/<picture\b[^>]*>([\s\S]*?)<\/picture>/gi, (match, inner) => {
+      return inner.replace(/<source\b[^>]*\/?>/gi, "");
+    });
+    cleanHtml = cleanHtml.replace(/<source\b[^>]*\/?>/gi, "");
+
+    const plainCharCount = cleanHtml.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().length;
 
     // Fallback if content < 150 characters
     if (plainCharCount < 150) {
@@ -697,17 +661,18 @@ export async function GET(request: Request) {
         readTime: "1 min read",
         summary: summary || "Direct content extraction limited.",
         content: "",
+        htmlContent: "",
         codeSnippets: [],
         url: targetUrl,
         sourceType: "article",
-        contentType: "markdown",
+        contentType: "html",
         isFallback: true,
         fallbackReason:
           "Article text is protected behind a paywall, anti-bot barrier, or rendered dynamically via client-side JavaScript (< 150 characters extracted).",
       });
     }
 
-    const wordCount = content.split(/\s+/).length;
+    const wordCount = plainCharCount / 5;
     const readTime = `${Math.max(1, Math.round(wordCount / 200))} min read`;
 
     return NextResponse.json({
@@ -716,11 +681,12 @@ export async function GET(request: Request) {
       domain,
       readTime,
       summary: summary || "Extracted in clean distraction-free reader mode.",
-      content,
-      codeSnippets,
+      content: cleanHtml,
+      htmlContent: cleanHtml,
+      codeSnippets: [],
       url: targetUrl,
       sourceType: "article",
-      contentType: "markdown",
+      contentType: "html",
       isFallback: false,
     });
   } catch {
@@ -731,10 +697,11 @@ export async function GET(request: Request) {
       readTime: "1 min read",
       summary: "Clean distraction-free preview generated for this technical link.",
       content: "",
+      htmlContent: "",
       codeSnippets: [],
       url: targetUrl,
       sourceType: "article",
-      contentType: "markdown",
+      contentType: "html",
       isFallback: true,
       fallbackReason: "Site timed out or origin refused automated retrieval.",
     });

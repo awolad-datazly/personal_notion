@@ -13,8 +13,6 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import { readGeminiKey } from "@/lib/gemini-key";
 import { toast } from "@/components/ui/toast";
 
@@ -51,6 +49,7 @@ export type ReaderArticle = {
   readTime: string;
   summary: string;
   content: string;
+  htmlContent?: string;
   codeSnippets: string[];
   url: string;
   sourceType?: "github" | "devto" | "hackernews" | "article";
@@ -138,7 +137,8 @@ export function ArticleReaderDrawer() {
 
     setTldrLoading(true);
     try {
-      const cleanText = article.content.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+      const raw = article.htmlContent || article.content;
+      const cleanText = raw.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
       const hasContent = cleanText.length >= 100;
       const prompt = hasContent
         ? `Summarize this technical article for a senior software engineer in 3 concise bullet points. Focus on architectural decisions, trade-offs, and engineering takeaways.\n\nTitle: ${article.title}\nDomain: ${article.domain}\nContent: ${cleanText.slice(0, 3500)}`
@@ -184,7 +184,8 @@ export function ArticleReaderDrawer() {
   if (!open) return null;
 
   const isFallbackView = Boolean(
-    article?.isFallback || (!loading && article && !article.content && article.summary)
+    article?.isFallback ||
+      (!loading && article && !article.content && !article.htmlContent && article.summary)
   );
 
   return (
@@ -483,121 +484,14 @@ export function ArticleReaderDrawer() {
                     </button>
                   </div>
                 </div>
-              ) : article.contentType === "html" ? (
-                /* Rich Pre-Rendered HTML (GitHub Repos, Dev.to, Clean Articles) */
-                <div
-                  className={`leading-relaxed text-zinc-200 ${
-                    fontSerif ? "font-serif text-[17px]" : "font-sans text-[15px] sm:text-base"
-                  } [&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-lg [&_img]:my-3 [&_img]:inline-block [&_div[align='center']]:text-center [&_p[align='center']]:text-center [&_h1]:text-xl [&_h1]:font-semibold [&_h1]:text-zinc-100 [&_h1]:mt-6 [&_h1]:mb-3 [&_h2]:text-lg [&_h2]:font-semibold [&_h2]:text-zinc-100 [&_h2]:mt-5 [&_h2]:mb-2 [&_h3]:text-base [&_h3]:font-semibold [&_h3]:text-zinc-200 [&_h3]:mt-4 [&_h3]:mb-2 [&_p]:text-sm [&_p]:text-zinc-300 [&_p]:leading-relaxed [&_p]:mb-4 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:space-y-1.5 [&_ul]:text-sm [&_ul]:text-zinc-300 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:space-y-1.5 [&_ol]:text-sm [&_ol]:text-zinc-300 [&_li]:leading-relaxed [&_li]:text-zinc-300 [&_a]:text-zinc-100 [&_a]:underline [&_a]:underline-offset-4 hover:[&_a]:text-white [&_pre]:bg-zinc-900 [&_pre]:border [&_pre]:border-zinc-800 [&_pre]:p-3.5 [&_pre]:rounded-lg [&_pre]:overflow-x-auto [&_pre]:font-mono [&_pre]:text-xs [&_pre]:my-4 [&_code]:font-mono [&_code]:text-xs [&_code]:bg-zinc-800/80 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_table]:w-full [&_table]:text-sm [&_table]:border-collapse [&_th]:border [&_th]:border-zinc-800 [&_th]:bg-zinc-900 [&_th]:p-2 [&_td]:border [&_td]:border-zinc-800 [&_td]:p-2 [&_blockquote]:border-l-2 [&_blockquote]:border-zinc-700 [&_blockquote]:pl-4 [&_blockquote]:py-1 [&_blockquote]:italic [&_blockquote]:my-4 [&_blockquote]:text-zinc-300 [&_hr]:border-zinc-800 [&_hr]:my-6`}
-                  dangerouslySetInnerHTML={{ __html: article.content }}
-                />
               ) : (
-                /* Structured Markdown Content Body */
+                /* Rendered Article / README / Discussion Content */
                 <div
-                  className={`leading-relaxed text-zinc-200 ${
-                    fontSerif ? "font-serif text-[17px]" : "font-sans text-[15px] sm:text-base"
-                  }`}
-                >
-                  <ReactMarkdown
-                    remarkPlugins={[remarkGfm]}
-                    components={{
-                      h1: ({ children }) => (
-                        <h1 className="text-xl sm:text-2xl font-bold text-zinc-100 mt-6 mb-3 leading-snug">
-                          {children}
-                        </h1>
-                      ),
-                      h2: ({ children }) => (
-                        <h2 className="text-lg sm:text-xl font-bold text-zinc-100 mt-6 mb-2.5 pb-1.5 border-b border-zinc-800/80 leading-snug">
-                          {children}
-                        </h2>
-                      ),
-                      h3: ({ children }) => (
-                        <h3 className="text-base sm:text-lg font-semibold text-zinc-200 mt-5 mb-2 leading-snug">
-                          {children}
-                        </h3>
-                      ),
-                      h4: ({ children }) => (
-                        <h4 className="text-sm sm:text-base font-semibold text-zinc-300 mt-4 mb-1.5 leading-snug">
-                          {children}
-                        </h4>
-                      ),
-                      p: ({ children }) => (
-                        <p className="mb-4 leading-relaxed text-zinc-200">{children}</p>
-                      ),
-                      ul: ({ children }) => (
-                        <ul className="list-disc list-outside ml-5 mb-4 space-y-1.5 text-zinc-200">
-                          {children}
-                        </ul>
-                      ),
-                      ol: ({ children }) => (
-                        <ol className="list-decimal list-outside ml-5 mb-4 space-y-1.5 text-zinc-200">
-                          {children}
-                        </ol>
-                      ),
-                      li: ({ children }) => (
-                        <li className="leading-relaxed text-zinc-200">{children}</li>
-                      ),
-                      blockquote: ({ children }) => (
-                        <blockquote className="border-l-2 border-zinc-600 pl-4 py-1 italic my-4 text-zinc-300 bg-zinc-900/30 rounded-r">
-                          {children}
-                        </blockquote>
-                      ),
-                      pre: ({ children }) => (
-                        <pre className="bg-zinc-900 border border-zinc-800 p-3.5 rounded-lg overflow-x-auto font-mono text-xs my-4 leading-relaxed text-zinc-200">
-                          {children}
-                        </pre>
-                      ),
-                      code: ({ className, children, ...props }: React.ComponentPropsWithoutRef<"code">) => {
-                        const isInline = !className && !String(children).includes("\n");
-                        if (isInline) {
-                          return (
-                            <code
-                              className="bg-zinc-800/80 px-1.5 py-0.5 rounded font-mono text-xs text-zinc-200 border border-zinc-700/50"
-                              {...props}
-                            >
-                              {children}
-                            </code>
-                          );
-                        }
-                        return (
-                          <code className={className} {...props}>
-                            {children}
-                          </code>
-                        );
-                      },
-                      a: ({ href, children }) => (
-                        <a
-                          href={href}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-zinc-200 underline underline-offset-4 decoration-zinc-500 hover:text-white hover:decoration-zinc-300 transition-colors"
-                        >
-                          {children}
-                        </a>
-                      ),
-                      hr: () => <hr className="my-6 border-zinc-800" />,
-                      table: ({ children }) => (
-                        <div className="overflow-x-auto my-4 border border-zinc-800 rounded-lg">
-                          <table className="min-w-full divide-y divide-zinc-800 font-mono text-xs text-zinc-300">
-                            {children}
-                          </table>
-                        </div>
-                      ),
-                      th: ({ children }) => (
-                        <th className="px-3 py-2 text-left font-semibold text-zinc-200 bg-zinc-900/80 border-b border-zinc-800">
-                          {children}
-                        </th>
-                      ),
-                      td: ({ children }) => (
-                        <td className="px-3 py-2 border-t border-zinc-800/60 text-zinc-300">
-                          {children}
-                        </td>
-                      ),
-                    }}
-                  >
-                    {article.content}
-                  </ReactMarkdown>
-                </div>
+                  className={`reader-prose text-sm text-zinc-300 leading-relaxed space-y-4 ${
+                    fontSerif ? "font-serif text-[15px]" : "font-sans"
+                  } [&_h1]:text-xl [&_h1]:font-semibold [&_h1]:text-zinc-100 [&_h1]:mt-6 [&_h1]:mb-3 [&_h1]:border-b [&_h1]:border-zinc-800 [&_h1]:pb-2 [&_h2]:text-lg [&_h2]:font-semibold [&_h2]:text-zinc-100 [&_h2]:mt-6 [&_h2]:mb-2 [&_h3]:text-base [&_h3]:font-semibold [&_h3]:text-zinc-200 [&_h3]:mt-4 [&_h3]:mb-2 [&_p]:my-3 [&_p]:leading-relaxed [&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-lg [&_img]:my-3 [&_img]:inline-block [&_div[align='center']]:text-center [&_p[align='center']]:text-center [&_a]:text-zinc-100 [&_a]:underline [&_a]:underline-offset-4 hover:[&_a]:text-white [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:space-y-1.5 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:space-y-1.5 [&_pre]:bg-zinc-900 [&_pre]:border [&_pre]:border-zinc-800 [&_pre]:p-3.5 [&_pre]:rounded-lg [&_pre]:overflow-x-auto [&_pre]:font-mono [&_pre]:text-xs [&_pre]:my-4 [&_code]:font-mono [&_code]:text-xs [&_code]:bg-zinc-800/80 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_table]:w-full [&_table]:text-xs [&_table]:border-collapse [&_th]:border [&_th]:border-zinc-800 [&_th]:bg-zinc-900 [&_th]:p-2 [&_td]:border [&_td]:border-zinc-800 [&_td]:p-2 [&_blockquote]:border-l-2 [&_blockquote]:border-zinc-700 [&_blockquote]:pl-4 [&_blockquote]:py-1 [&_blockquote]:italic [&_blockquote]:my-4 [&_blockquote]:text-zinc-300 [&_hr]:border-zinc-800 [&_hr]:my-6`}
+                  dangerouslySetInnerHTML={{ __html: article.htmlContent || article.content }}
+                />
               )}
             </>
           ) : null}
