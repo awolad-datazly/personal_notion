@@ -170,6 +170,200 @@ function injectBlankTargetToLinks(html: string): string {
   });
 }
 
+function markdownToHtml(
+  md: string,
+  owner: string,
+  repo: string,
+  branch = "main"
+): string {
+  // 1. Strip all HTML comments
+  let text = md.replace(/<!--[\s\S]*?-->/g, "");
+
+  // 2. Protect fenced code blocks (```lang ... ```)
+  const codeBlocks: string[] = [];
+  text = text.replace(/```([a-zA-Z0-9_+-]+)?\r?\n([\s\S]*?)```/g, (_m, lang, code) => {
+    const escaped = code
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+    const langAttr = lang ? ` class="language-${lang}"` : "";
+    const placeholder = `\u0000CB${codeBlocks.length}\u0000`;
+    codeBlocks.push(`<pre><code${langAttr}>${escaped}</code></pre>`);
+    return placeholder;
+  });
+
+  // 3. Protect inline code (`...`)
+  const inlineCodes: string[] = [];
+  text = text.replace(/`([^`\r\n]+)`/g, (_m, code) => {
+    const escaped = code
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+    const placeholder = `\u0000IC${inlineCodes.length}\u0000`;
+    inlineCodes.push(`<code>${escaped}</code>`);
+    return placeholder;
+  });
+
+  // 4. Linked badges: [![alt](imgUrl)](linkUrl)
+  text = text.replace(
+    /\[!\[([^\]]*)\]\(([^)]+)\)\]\(([^)]+)\)/g,
+    (_m, alt, imgUrl, linkUrl) => {
+      return `<a href="${linkUrl.trim()}"><img src="${imgUrl.trim()}" alt="${alt}" class="inline-block mr-1.5 my-1" /></a>`;
+    }
+  );
+
+  // 5. Standalone images: ![alt](imgUrl)
+  text = text.replace(
+    /!\[([^\]]*)\]\(([^)]+)\)/g,
+    (_m, alt, imgUrl) => {
+      return `<img src="${imgUrl.trim()}" alt="${alt}" />`;
+    }
+  );
+
+  // 6. Markdown links: [label](url)
+  text = text.replace(
+    /\[([^\]]+)\]\(([^)]+)\)/g,
+    (_m, label, url) => {
+      return `<a href="${url.trim()}">${label}</a>`;
+    }
+  );
+
+  // 7. Headings: # to ######
+  text = text.replace(/^(#{1,6})\s+(.+)$/gm, (_m, hashes, content) => {
+    const level = hashes.length;
+    return `<h${level}>${content.trim()}</h${level}>`;
+  });
+
+  // 8. Bold and Italic using asterisks/underscores
+  text = text.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+  text = text.replace(/__([^_]+)__/g, "<strong>$1</strong>");
+  text = text.replace(/(^|[^\w*])\*([^*\r\n]+)\*([^\w*]|$)/g, "$1<em>$2</em>$3");
+  text = text.replace(/(^|[^\w_])_([^_\r\n]+)_([^\w_]|$)/g, "$1<em>$2</em>$3");
+
+  // 9. Horizontal rules
+  text = text.replace(/^(?:---|___|\*\*\*)\s*$/gm, "<hr />");
+
+  // 10. Blockquotes
+  text = text.replace(/^>\s*(.+)$/gm, "<blockquote>$1</blockquote>");
+
+  // 11. Tables
+  text = text.replace(
+    /(?:^\|[^\n]+\|\r?\n)+/gm,
+    (tableBlock) => {
+      const lines = tableBlock.trim().split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+      if (lines.length < 2) return tableBlock;
+      const isSep = /^\|(?:\s*:?-+:?\s*\|)+$/.test(lines[1]);
+      if (!isSep) return tableBlock;
+
+      const parseRow = (line: string) =>
+        line
+          .replace(/^\||\|$/g, "")
+          .split("|")
+          .map((c) => c.trim());
+
+      const headers = parseRow(lines[0]);
+      const rows = lines.slice(2).map(parseRow);
+
+      let out = `<table class="w-full text-xs border-collapse my-4"><thead><tr>`;
+      headers.forEach((h) => {
+        out += `<th class="border border-zinc-800 bg-zinc-900 p-2 font-semibold text-zinc-100">${h}</th>`;
+      });
+      out += `</tr></thead><tbody>`;
+      rows.forEach((r) => {
+        out += `<tr>`;
+        r.forEach((c) => {
+          out += `<td class="border border-zinc-800 p-2 text-zinc-300">${c}</td>`;
+        });
+        out += `</tr>`;
+      });
+      out += `</tbody></table>`;
+      return out;
+    }
+  );
+
+  // 12. Lists
+  const lines = text.split(/\r?\n/);
+  const processedLines: string[] = [];
+  let inUl = false;
+  let inOl = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const ulMatch = line.match(/^(\s*)[-*+]\s+(.*)$/);
+    const olMatch = line.match(/^(\s*)\d+\.\s+(.*)$/);
+
+    if (ulMatch) {
+      if (!inUl) {
+        if (inOl) {
+          processedLines.push("</ol>");
+          inOl = false;
+        }
+        processedLines.push("<ul>");
+        inUl = true;
+      }
+      processedLines.push(`<li>${ulMatch[2]}</li>`);
+    } else if (olMatch) {
+      if (!inOl) {
+        if (inUl) {
+          processedLines.push("</ul>");
+          inUl = false;
+        }
+        processedLines.push("<ol>");
+        inOl = true;
+      }
+      processedLines.push(`<li>${olMatch[2]}</li>`);
+    } else {
+      if (inUl) {
+        processedLines.push("</ul>");
+        inUl = false;
+      }
+      if (inOl) {
+        processedLines.push("</ol>");
+        inOl = false;
+      }
+      processedLines.push(line);
+    }
+  }
+  if (inUl) processedLines.push("</ul>");
+  if (inOl) processedLines.push("</ol>");
+
+  text = processedLines.join("\n");
+
+  // 13. Paragraphs (leaving HTML blocks and placeholders un-wrapped)
+  const chunks = text.split(/\n{2,}/);
+  const htmlChunks = chunks.map((chunk) => {
+    const trimmed = chunk.trim();
+    if (!trimmed) return "";
+    if (
+      /^<(?:h[1-6]|p|div|table|ul|ol|li|blockquote|pre|hr|details|summary|picture|source)\b/i.test(
+        trimmed
+      ) ||
+      trimmed.startsWith("\u0000CB")
+    ) {
+      return trimmed;
+    }
+    return `<p>${trimmed.replace(/\n/g, "<br/>")}</p>`;
+  });
+
+  text = htmlChunks.filter(Boolean).join("\n\n");
+
+  // 14. Restore protected inline code
+  inlineCodes.forEach((codeHtml, idx) => {
+    text = text.replace(`\u0000IC${idx}\u0000`, codeHtml);
+  });
+
+  // 15. Restore protected code blocks
+  codeBlocks.forEach((codeHtml, idx) => {
+    text = text.replace(`\u0000CB${idx}\u0000`, codeHtml);
+  });
+
+  // 16. Resolve relative paths and inject blank targets
+  text = resolveGitHubHtml(text, owner, repo, branch);
+  text = injectBlankTargetToLinks(text);
+
+  return text;
+}
+
 async function handleGitHub(owner: string, repo: string, targetUrl: string): Promise<NextResponse> {
   const headers: Record<string, string> = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) DevPulse-Reader/1.0",
@@ -250,7 +444,7 @@ async function handleGitHub(owner: string, repo: string, targetUrl: string): Pro
               // continue
             }
             if (!readmeHtml) {
-              readmeHtml = `<pre><code>${rawMd.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</code></pre>`;
+              readmeHtml = markdownToHtml(rawMd, owner, repo, b);
               break;
             }
           }
