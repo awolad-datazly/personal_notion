@@ -3,8 +3,11 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { useSyncExternalStore } from "react";
 import { NAV_ICONS } from "@/components/shell/nav-icons";
 import type { NavItem, NavSection } from "@/config/navigation";
+import { getBookmarks } from "@/lib/bookmarks-storage";
+import { subscribeToStorage } from "@/lib/storage-bus";
 import { cn } from "@/lib/utils";
 
 const SECTIONS: NavSection[] = ["WORKSPACE", "LIBRARY", "SYSTEM"];
@@ -17,6 +20,7 @@ export function SidebarNav({
   onNavigate?: () => void;
 }) {
   const pathname = usePathname();
+  const bookmarkCount = useSyncExternalStore(subscribeToStorage, () => getBookmarks().length, () => 4);
 
   return (
     <nav className="flex flex-col gap-4 px-3 py-3">
@@ -61,6 +65,10 @@ export function SidebarNav({
                     <kbd className="hidden font-mono text-xs text-zinc-400 group-hover:text-zinc-300 sm:inline-block">
                       {item.shortcut}
                     </kbd>
+                  ) : item.href === "/bookmarks" ? (
+                    <span className="font-mono text-xs text-zinc-300 rounded bg-zinc-800 px-2 py-0.5 border border-zinc-700/50">
+                      {bookmarkCount}
+                    </span>
                   ) : item.count ? (
                     <span className="font-mono text-xs text-zinc-300 rounded bg-zinc-800 px-2 py-0.5 border border-zinc-700/50">
                       {item.count}

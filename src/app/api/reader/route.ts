@@ -160,17 +160,31 @@ function resolveGitHubHtml(
   return html;
 }
 
+function injectBlankTargetToLinks(html: string): string {
+  return html.replace(/<a\b([^>]*?)>/gi, (_match, attrs) => {
+    const cleanAttrs = attrs
+      .replace(/\btarget=["'][^"']*["']/gi, "")
+      .replace(/\brel=["'][^"']*["']/gi, "")
+      .trim();
+    return `<a target="_blank" rel="noopener noreferrer" ${cleanAttrs}>`;
+  });
+}
+
 async function handleGitHub(owner: string, repo: string, targetUrl: string): Promise<NextResponse> {
-  const headers = {
+  const headers: Record<string, string> = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) DevPulse-Reader/1.0",
     Accept: "application/vnd.github.v3+json",
   };
+  if (process.env.GITHUB_TOKEN) {
+    headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
+  }
 
   let repoData: GitHubRepoApiResponse | null = null;
   try {
     const repoRes = await fetch(`https://api.github.com/repos/${owner}/${repo}`, {
       headers,
-      signal: AbortSignal.timeout(6000),
+      signal: AbortSignal.timeout(8000),
+      next: { revalidate: 900 },
     });
     if (repoRes.ok) {
       repoData = (await repoRes.json()) as GitHubRepoApiResponse;
@@ -186,10 +200,11 @@ async function handleGitHub(owner: string, repo: string, targetUrl: string): Pro
   try {
     const readmeRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/readme`, {
       headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) DevPulse-Reader/1.0",
+        ...headers,
         Accept: "application/vnd.github.html+json",
       },
-      signal: AbortSignal.timeout(6000),
+      signal: AbortSignal.timeout(8000),
+      next: { revalidate: 900 },
     });
 
     if (readmeRes.ok) {
@@ -252,6 +267,7 @@ async function handleGitHub(owner: string, repo: string, targetUrl: string): Pro
 
   // Resolve relative images and links, unwrap picture tags, and strip HTML comments
   readmeHtml = resolveGitHubHtml(readmeHtml, owner, repo, defaultBranch);
+  readmeHtml = injectBlankTargetToLinks(readmeHtml);
 
   // Extract code snippets from html
   const codeSnippets: string[] = [];
@@ -282,8 +298,16 @@ async function handleGitHub(owner: string, repo: string, targetUrl: string): Pro
     gitHubStats: {
       stars: repoData?.stargazers_count ?? 0,
       forks: repoData?.forks_count ?? 0,
-      language: repoData?.language || "Repository",
-      license: repoData?.license?.spdx_id || null,
+      language:
+        repoData?.language && repoData.language !== "null" && repoData.language !== "Repository"
+          ? repoData.language
+          : "Repository",
+      license:
+        repoData?.license?.spdx_id &&
+        repoData.license.spdx_id !== "NOASSERTION" &&
+        repoData.license.spdx_id !== "null"
+          ? repoData.license.spdx_id
+          : null,
       openIssues: repoData?.open_issues_count ?? 0,
     },
   };
@@ -309,7 +333,8 @@ async function handleDevTo(username: string, slug: string, targetUrl: string): P
   try {
     const res = await fetch(`https://dev.to/api/articles/${username}/${slug}`, {
       headers: { "User-Agent": "DevPulse-Reader/1.0" },
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(8000),
+      next: { revalidate: 900 },
     });
 
     if (!res.ok) throw new Error(`Dev.to API responded with ${res.status}`);
@@ -318,7 +343,11 @@ async function handleDevTo(username: string, slug: string, targetUrl: string): P
     const rawContent = article.body_html || article.body_markdown || "";
     if (!rawContent) throw new Error("Empty Dev.to body content");
 
-    const content = rawContent.replace(/<!--[\s\S]*?-->/g, "");
+    const content = injectBlankTargetToLinks(
+      rawContent
+        .replace(/<!--[\s\S]*?-->/g, "")
+        .replace(/<img\b(?![^>]*\breferrerpolicy=)([^>]*?)>/gi, '<img referrerpolicy="no-referrer" loading="lazy" $1>')
+    );
     const contentType = "html";
 
     const codeSnippets: string[] = [];
@@ -392,7 +421,8 @@ async function handleHackerNews(id: string, targetUrl: string): Promise<NextResp
   try {
     const storyRes = await fetch(`https://hacker-news.firebaseio.com/v0/item/${id}.json`, {
       headers: { "User-Agent": "DevPulse-Reader/1.0" },
-      signal: AbortSignal.timeout(6000),
+      signal: AbortSignal.timeout(8000),
+      next: { revalidate: 900 },
     });
 
     if (!storyRes.ok) throw new Error("Failed to load HN story");
@@ -409,7 +439,8 @@ async function handleHackerNews(id: string, targetUrl: string): Promise<NextResp
     const commentPromises = kidIds.map(async (kidId: number) => {
       try {
         const cr = await fetch(`https://hacker-news.firebaseio.com/v0/item/${kidId}.json`, {
-          signal: AbortSignal.timeout(4000),
+          signal: AbortSignal.timeout(8000),
+          next: { revalidate: 900 },
         });
         if (!cr.ok) return null;
         return await cr.json();
@@ -441,14 +472,16 @@ async function handleHackerNews(id: string, targetUrl: string): Promise<NextResp
     }
     htmlContent += `</div>`;
 
+    const safeHtml = injectBlankTargetToLinks(htmlContent);
+
     const payload: ReaderResponse = {
       title,
       author,
       domain: "news.ycombinator.com",
       readTime: "3 min read",
       summary: `Hacker News discussion with ${score} points and ${descendants} comments.`,
-      content: htmlContent,
-      htmlContent,
+      content: safeHtml,
+      htmlContent: safeHtml,
       codeSnippets: [],
       url: targetUrl,
       sourceType: "hackernews",
@@ -516,7 +549,8 @@ export async function GET(request: Request) {
   // 4. Generic Article / Technical Blog Extractor
   try {
     const res = await fetch(targetUrl, {
-      signal: AbortSignal.timeout(7000),
+      signal: AbortSignal.timeout(8000),
+      next: { revalidate: 900 },
       headers: {
         "User-Agent":
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36 DevPulse/1.0",
@@ -686,6 +720,7 @@ export async function GET(request: Request) {
 
     const wordCount = plainCharCount / 5;
     const readTime = `${Math.max(1, Math.round(wordCount / 200))} min read`;
+    const safeHtml = injectBlankTargetToLinks(cleanHtml);
 
     return NextResponse.json({
       title,
@@ -693,8 +728,8 @@ export async function GET(request: Request) {
       domain,
       readTime,
       summary: summary || "Extracted in clean distraction-free reader mode.",
-      content: cleanHtml,
-      htmlContent: cleanHtml,
+      content: safeHtml,
+      htmlContent: safeHtml,
       codeSnippets: [],
       url: targetUrl,
       sourceType: "article",

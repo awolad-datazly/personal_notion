@@ -1,3 +1,5 @@
+import { notifyStorageUpdate } from "@/lib/storage-bus";
+
 export type SavedStudySession = {
   id: string;
   videoId: string;
@@ -93,8 +95,12 @@ export function saveStudySession(session: Partial<SavedStudySession> & { videoId
       updated = [newSession, ...current];
     }
 
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated.slice(0, 10)));
-    window.dispatchEvent(new Event("storage"));
+    const sliced = updated.slice(0, 10);
+    const raw = JSON.stringify(sliced);
+    _cachedRaw = raw;
+    _cachedSessions = sliced;
+    localStorage.setItem(STORAGE_KEY, raw);
+    notifyStorageUpdate("study");
   } catch {
     // localStorage error handling
   }

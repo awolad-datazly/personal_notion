@@ -39,7 +39,7 @@ function loadYouTubeApi() {
 
 export function YouTubePlayer({ videoId }: { videoId: string }) {
   const hostId = useId().replace(/:/g, "");
-  const containerRef = useRef<HTMLDivElement | null>(null);
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
   const playerRef = useRef<YT.Player | null>(null);
   const { apiRef } = useVaultPlayer();
 
@@ -49,12 +49,28 @@ export function YouTubePlayer({ videoId }: { videoId: string }) {
     async function mount() {
       await loadYouTubeApi();
 
-      if (cancelled || !containerRef.current || !window.YT?.Player) {
+      if (cancelled || !wrapperRef.current || !window.YT?.Player) {
         return;
       }
 
-      playerRef.current?.destroy();
-      playerRef.current = new window.YT.Player(containerRef.current, {
+      // Destroy previous player instance cleanly
+      if (playerRef.current) {
+        try {
+          playerRef.current.destroy();
+        } catch {
+          // ignore cleanup errors
+        }
+        playerRef.current = null;
+      }
+
+      // Re-create mount target inside persistent wrapper
+      wrapperRef.current.innerHTML = "";
+      const mountTarget = document.createElement("div");
+      mountTarget.id = `yt-${hostId}-${videoId}`;
+      mountTarget.className = "w-full h-full";
+      wrapperRef.current.appendChild(mountTarget);
+
+      playerRef.current = new window.YT.Player(mountTarget, {
         videoId,
         width: "100%",
         height: "100%",
@@ -65,6 +81,7 @@ export function YouTubePlayer({ videoId }: { videoId: string }) {
         },
         events: {
           onReady: (event) => {
+            if (cancelled) return;
             apiRef.current = {
               getCurrentTime: () => event.target.getCurrentTime() || 0,
               seekTo: (seconds) => event.target.seekTo(seconds, true),
@@ -79,14 +96,20 @@ export function YouTubePlayer({ videoId }: { videoId: string }) {
     return () => {
       cancelled = true;
       apiRef.current = null;
-      playerRef.current?.destroy();
-      playerRef.current = null;
+      if (playerRef.current) {
+        try {
+          playerRef.current.destroy();
+        } catch {
+          // ignore cleanup errors
+        }
+        playerRef.current = null;
+      }
     };
-  }, [apiRef, videoId]);
+  }, [apiRef, hostId, videoId]);
 
   return (
     <div className="relative aspect-video overflow-hidden rounded-xl border border-border bg-black">
-      <div id={hostId} ref={containerRef} className="absolute inset-0 h-full w-full" />
+      <div ref={wrapperRef} className="absolute inset-0 h-full w-full" />
     </div>
   );
 }

@@ -1,12 +1,3 @@
-const YOUTUBE_HOSTS = new Set([
-  "youtube.com",
-  "www.youtube.com",
-  "m.youtube.com",
-  "music.youtube.com",
-  "youtu.be",
-  "www.youtu.be",
-]);
-
 export function extractYouTubeId(input: string) {
   const trimmed = input.trim();
 
@@ -18,34 +9,52 @@ export function extractYouTubeId(input: string) {
     return trimmed;
   }
 
+  // Prepend protocol if missing to allow standard URL parsing
+  const urlCandidate = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+
   try {
-    const url = new URL(trimmed);
+    const url = new URL(urlCandidate);
+    const hostname = url.hostname.toLowerCase().replace(/^www\./, "");
 
-    if (!YOUTUBE_HOSTS.has(url.hostname)) {
-      return null;
-    }
-
-    if (url.hostname.includes("youtu.be")) {
+    if (hostname === "youtu.be") {
       const id = url.pathname.split("/").filter(Boolean)[0];
-      return id && /^[a-zA-Z0-9_-]{11}$/.test(id) ? id : null;
+      if (id && /^[a-zA-Z0-9_-]{11}$/.test(id)) {
+        return id;
+      }
     }
 
-    const fromQuery = url.searchParams.get("v");
-    if (fromQuery && /^[a-zA-Z0-9_-]{11}$/.test(fromQuery)) {
-      return fromQuery;
-    }
+    if (
+      hostname === "youtube.com" ||
+      hostname === "m.youtube.com" ||
+      hostname === "music.youtube.com"
+    ) {
+      const fromQuery = url.searchParams.get("v");
+      if (fromQuery && /^[a-zA-Z0-9_-]{11}$/.test(fromQuery)) {
+        return fromQuery;
+      }
 
-    const parts = url.pathname.split("/").filter(Boolean);
-    const markerIndex = parts.findIndex((part) =>
-      ["embed", "shorts", "live", "v"].includes(part),
-    );
+      const parts = url.pathname.split("/").filter(Boolean);
+      const markerIndex = parts.findIndex((part) =>
+        ["embed", "shorts", "live", "v"].includes(part.toLowerCase()),
+      );
 
-    if (markerIndex >= 0) {
-      const id = parts[markerIndex + 1];
-      return id && /^[a-zA-Z0-9_-]{11}$/.test(id) ? id : null;
+      if (markerIndex >= 0) {
+        const id = parts[markerIndex + 1];
+        if (id && /^[a-zA-Z0-9_-]{11}$/.test(id)) {
+          return id;
+        }
+      }
     }
   } catch {
-    return null;
+    // Fall back to regex below
+  }
+
+  // Comprehensive regex fallback for URLs with extra parameters or unusual formatting
+  const regexMatch = trimmed.match(
+    /(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|shorts\/|live\/|watch\?.*?[&?]v=))([a-zA-Z0-9_-]{11})/i,
+  );
+  if (regexMatch && regexMatch[1]) {
+    return regexMatch[1];
   }
 
   return null;
@@ -95,17 +104,21 @@ export function formatTimestamp(totalSeconds: number) {
 }
 
 export function parseTimestampToken(token: string) {
-  const match = token.trim().match(/^(?:(\d+):)?(\d{1,2}):(\d{2})$/);
+  const cleaned = token.trim().replace(/^\[|\]$/g, "").trim();
+  const match = cleaned.match(/^(?:(\d{1,3}):)?(\d{1,2}):(\d{2})$/);
 
   if (!match) {
     return null;
   }
 
-  const hours = Number(match[1] ?? 0);
+  const hours = match[1] ? Number(match[1]) : 0;
   const minutes = Number(match[2]);
   const seconds = Number(match[3]);
 
-  if (minutes > 59 || seconds > 59) {
+  if (hours > 0 && minutes > 59) {
+    return null;
+  }
+  if (seconds > 59) {
     return null;
   }
 

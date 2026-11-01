@@ -1,10 +1,12 @@
 "use client";
 
-import { ArrowUpRight, BookOpen, RefreshCw } from "lucide-react";
+import { ArrowUpRight, Bookmark, BookOpen, RefreshCw } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { openArticleReader } from "@/components/reader/article-reader-drawer";
 import { toast } from "@/components/ui/toast";
+import { isBookmarked, toggleBookmark } from "@/lib/bookmarks-storage";
+import { subscribeToStorage } from "@/lib/storage-bus";
 
 export type SignalItem = {
   id: string;
@@ -81,6 +83,39 @@ const INITIAL_SIGNALS: SignalItem[] = [
     createdAt: new Date().toISOString(),
   },
 ];
+
+function SignalBookmarkButton({ item }: { item: SignalItem }) {
+  const bookmarked = useSyncExternalStore(
+    subscribeToStorage,
+    () => isBookmarked(item.url),
+    () => false,
+  );
+
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        const next = toggleBookmark({
+          id: item.url,
+          title: item.title,
+          url: item.url,
+          source: item.sourceName,
+          summary: item.takeaway,
+          tags: [item.category],
+        });
+        toast.success(next ? "Saved to Bookmarks" : "Removed from Bookmarks");
+      }}
+      className={`flex h-9 items-center justify-center rounded-md border border-zinc-700/70 bg-zinc-800 px-2.5 text-sm transition-colors shadow-xs active:scale-[0.98] ${
+        bookmarked
+          ? "text-amber-400 border-amber-500/40"
+          : "text-zinc-400 hover:text-white hover:bg-zinc-700"
+      }`}
+      title={bookmarked ? "Remove from Bookmarks" : "Save to Bookmarks"}
+    >
+      <Bookmark className={`size-4 ${bookmarked ? "fill-current" : ""}`} />
+    </button>
+  );
+}
 
 export function TechSignalTable() {
   const [signals, setSignals] = useState<SignalItem[]>(INITIAL_SIGNALS);
@@ -227,6 +262,8 @@ export function TechSignalTable() {
 
             {/* Hover Actions */}
             <div className="flex items-center gap-2 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity pt-0.5">
+              <SignalBookmarkButton item={item} />
+
               <button
                 type="button"
                 onClick={() => openArticleReader(item.url, item.title)}

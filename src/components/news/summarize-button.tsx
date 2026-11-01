@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "@/components/ui/toast";
 import { geminiAuthHeaders, readGeminiKey } from "@/lib/gemini-key";
 
 export function SummarizeButton({
@@ -23,7 +24,8 @@ export function SummarizeButton({
 
     const apiKey = readGeminiKey();
     if (!apiKey) {
-      setError("Set Gemini API key in the top bar first.");
+      toast.info("Please set your Gemini API key in the header to summarize articles.");
+      window.dispatchEvent(new CustomEvent("devpulse.open-byok"));
       return;
     }
 

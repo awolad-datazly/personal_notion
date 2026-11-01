@@ -1,7 +1,7 @@
 "use client";
 
 import { KeyRound, Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -22,17 +22,17 @@ import {
   readGeminiKey,
   writeGeminiKey,
 } from "@/lib/gemini-key";
+import { subscribeToStorage } from "@/lib/storage-bus";
 
 export function ByokDialog() {
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState("");
-  const [savedKey, setSavedKey] = useState("");
+  const savedKey = useSyncExternalStore(subscribeToStorage, readGeminiKey, () => "");
   const [status, setStatus] = useState<string | null>(null);
 
   useEffect(() => {
     function handleCustomOpen() {
       const existing = readGeminiKey();
-      setSavedKey(existing);
       setValue(existing);
       setStatus(null);
       setOpen(true);
@@ -49,7 +49,6 @@ export function ByokDialog() {
     }
 
     const existing = readGeminiKey();
-    setSavedKey(existing);
     setValue(existing);
     setStatus(null);
   }
@@ -57,14 +56,12 @@ export function ByokDialog() {
   function handleSave() {
     writeGeminiKey(value);
     const next = readGeminiKey();
-    setSavedKey(next);
     setValue(next);
     setStatus(next ? "Key saved in this browser only." : "Key cleared.");
   }
 
   function handleClear() {
     clearGeminiKey();
-    setSavedKey("");
     setValue("");
     setStatus("Key removed from localStorage.");
   }

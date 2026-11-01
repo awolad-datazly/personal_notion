@@ -101,7 +101,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const summary = await summarizeWithGemini({
+    const { summary, model } = await summarizeWithGemini({
       apiKey,
       title,
       url,
@@ -114,7 +114,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       summary,
-      model: "gemini-1.5-flash",
+      model,
       persisted: Boolean(newsId && body.persist !== false),
     });
   } catch (error) {

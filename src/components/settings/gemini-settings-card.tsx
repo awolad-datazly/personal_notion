@@ -9,14 +9,10 @@ import {
   readGeminiKey,
   writeGeminiKey,
 } from "@/lib/gemini-key";
-
-function subscribe(callback: () => void) {
-  window.addEventListener("storage", callback);
-  return () => window.removeEventListener("storage", callback);
-}
+import { subscribeToStorage } from "@/lib/storage-bus";
 
 export function GeminiSettingsCard() {
-  const savedKey = useSyncExternalStore(subscribe, readGeminiKey, () => "");
+  const savedKey = useSyncExternalStore(subscribeToStorage, readGeminiKey, () => "");
   const [value, setValue] = useState("");
   const [isEditing, setIsEditing] = useState(false);
   const [showKey, setShowKey] = useState(false);

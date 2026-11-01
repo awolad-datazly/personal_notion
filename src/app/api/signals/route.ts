@@ -108,15 +108,11 @@ function detectCategory(title: string, defaultCat = "Engineering"): string {
 
 async function fetchHackerNews(): Promise<SignalItem[]> {
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 4000);
-
     const res = await fetch("https://hacker-news.firebaseio.com/v0/topstories.json", {
-      signal: controller.signal,
+      signal: AbortSignal.timeout(8000),
       headers: { "Content-Type": "application/json" },
-      next: { revalidate: 120 },
+      next: { revalidate: 900 },
     });
-    clearTimeout(timeout);
 
     if (!res.ok) return [];
     const ids = ((await res.json()) as number[]).slice(0, 10);
@@ -125,7 +121,8 @@ async function fetchHackerNews(): Promise<SignalItem[]> {
       ids.map(async (id) => {
         try {
           const itemRes = await fetch(`https://hacker-news.firebaseio.com/v0/item/${id}.json`, {
-            next: { revalidate: 120 },
+            signal: AbortSignal.timeout(8000),
+            next: { revalidate: 900 },
           });
           if (!itemRes.ok) return null;
           return (await itemRes.json()) as {
@@ -206,14 +203,11 @@ const DEV_FALLBACK_SIGNALS: SignalItem[] = [
 
 async function fetchDevTo(): Promise<SignalItem[]> {
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 3500);
-
     const res = await fetch("https://dev.to/api/articles?top=1&per_page=10", {
-      signal: controller.signal,
+      signal: AbortSignal.timeout(8000),
       headers: { "Content-Type": "application/json" },
+      next: { revalidate: 900 },
     });
-    clearTimeout(timeout);
 
     if (!res.ok) return DEV_FALLBACK_SIGNALS;
     const articles = (await res.json()) as Array<{
@@ -254,21 +248,22 @@ async function fetchDevTo(): Promise<SignalItem[]> {
 
 async function fetchGitHubTrending(): Promise<SignalItem[]> {
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 4000);
+    const headers: Record<string, string> = {
+      "User-Agent": "DevPulse-TechHub",
+      Accept: "application/vnd.github.v3+json",
+    };
+    if (process.env.GITHUB_TOKEN) {
+      headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
+    }
 
     const res = await fetch(
       "https://api.github.com/search/repositories?q=stars:>1000&sort=updated&order=desc&per_page=8",
       {
-        signal: controller.signal,
-        headers: {
-          "User-Agent": "DevPulse-TechHub",
-          Accept: "application/vnd.github.v3+json",
-        },
-        next: { revalidate: 300 },
+        signal: AbortSignal.timeout(8000),
+        headers,
+        next: { revalidate: 900 },
       }
     );
-    clearTimeout(timeout);
 
     if (!res.ok) return [];
     const data = (await res.json()) as {
@@ -311,11 +306,15 @@ async function fetchGitHubTrending(): Promise<SignalItem[]> {
 }
 
 export async function GET() {
-  const [hnSignals, devSignals, ghSignals] = await Promise.all([
+  const results = await Promise.allSettled([
     fetchHackerNews(),
     fetchDevTo(),
     fetchGitHubTrending(),
   ]);
+
+  const hnSignals = results[0].status === "fulfilled" ? results[0].value : [];
+  const devSignals = results[1].status === "fulfilled" ? results[1].value : [];
+  const ghSignals = results[2].status === "fulfilled" ? results[2].value : [];
 
   let allSignals: SignalItem[] = [...hnSignals, ...devSignals, ...ghSignals];
 

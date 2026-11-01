@@ -2,62 +2,20 @@
 
 import { ArrowUpRight, Check, Copy, FileText, Terminal, Trash2, Video } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
-
-type BookmarkType = "ALL" | "VIDEO" | "ARTICLE" | "NOTE";
-
-type BookmarkItem = {
-  id: string;
-  type: "VIDEO" | "ARTICLE" | "NOTE";
-  title: string;
-  source: string;
-  date: string;
-  notes: string;
-  url: string;
-};
-
-const INITIAL_BOOKMARKS: BookmarkItem[] = [
-  {
-    id: "bm-1",
-    type: "VIDEO",
-    title: "Rust Ownership, Lifetimes, and Zero-Copy I/O Notes",
-    source: "YouTube • 3 timestamps",
-    date: "Oct 28, 2026",
-    notes: "std::io buffer reuse across worker threads without atomic locks; pinned memory with pin-project crate.",
-    url: "/vault",
-  },
-  {
-    id: "bm-2",
-    type: "ARTICLE",
-    title: "The Anatomy of a Production Distributed LSM Storage Engine",
-    source: "Hacker News Signal",
-    date: "Oct 25, 2026",
-    notes: "MemTable write stalls, Bloom filter false-positive curve tuning, and read-amplification tradeoffs in RocksDB.",
-    url: "/articles",
-  },
-  {
-    id: "bm-3",
-    type: "VIDEO",
-    title: "Next.js 16 Partial Prerendering: Instant Static Shells & Streaming Dynamics",
-    source: "YouTube • 4 timestamps",
-    date: "Oct 22, 2026",
-    notes: "Cache tag invalidation rules in App Router; wrapping un-cached headers() / cookies() in Suspense boundaries.",
-    url: "/vault",
-  },
-  {
-    id: "bm-4",
-    type: "NOTE",
-    title: "Consensus Protocols Cheat Sheet: Raft vs PBFT vs Paxos",
-    source: "Scratchpad Save",
-    date: "Oct 19, 2026",
-    notes: "Raft leader election safety invariant: a candidate must have an up-to-date log compared to quorum to win votes.",
-    url: "/#scratchpad",
-  },
-];
+import { useState, useSyncExternalStore } from "react";
+import { toast } from "@/components/ui/toast";
+import {
+  type BookmarkItem,
+  type BookmarkType,
+  getBookmarks,
+  INITIAL_BOOKMARKS,
+  removeBookmark,
+} from "@/lib/bookmarks-storage";
+import { subscribeToStorage } from "@/lib/storage-bus";
 
 export function BookmarksContent() {
   const [filter, setFilter] = useState<BookmarkType>("ALL");
-  const [bookmarks, setBookmarks] = useState(INITIAL_BOOKMARKS);
+  const bookmarks = useSyncExternalStore(subscribeToStorage, getBookmarks, () => INITIAL_BOOKMARKS);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const filtered =
@@ -66,7 +24,8 @@ export function BookmarksContent() {
       : bookmarks.filter((item) => item.type === filter);
 
   function handleDelete(id: string) {
-    setBookmarks((prev) => prev.filter((b) => b.id !== id));
+    removeBookmark(id);
+    toast.success("Bookmark removed");
   }
 
   async function handleCopy(item: BookmarkItem) {

@@ -4,14 +4,10 @@ import Link from "next/link";
 import { ArrowUpRight, Play } from "lucide-react";
 import { useSyncExternalStore } from "react";
 import { DEFAULT_SESSIONS, getStudySessions } from "@/lib/study-storage";
-
-function subscribe(callback: () => void) {
-  window.addEventListener("storage", callback);
-  return () => window.removeEventListener("storage", callback);
-}
+import { subscribeToStorage } from "@/lib/storage-bus";
 
 export function StudyVaultCompact() {
-  const sessions = useSyncExternalStore(subscribe, getStudySessions, () => DEFAULT_SESSIONS);
+  const sessions = useSyncExternalStore(subscribeToStorage, getStudySessions, () => DEFAULT_SESSIONS);
 
   return (
     <div className="flex flex-col space-y-3">

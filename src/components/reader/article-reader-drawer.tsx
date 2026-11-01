@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Bookmark,
   Copy,
   ExternalLink,
   GitFork,
@@ -12,8 +13,10 @@ import {
   Type,
   X,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { isBookmarked, toggleBookmark } from "@/lib/bookmarks-storage";
 import { readGeminiKey } from "@/lib/gemini-key";
+import { subscribeToStorage } from "@/lib/storage-bus";
 import { toast } from "@/components/ui/toast";
 
 function GithubIcon({ className = "size-4" }: { className?: string }) {
@@ -69,6 +72,20 @@ export function openArticleReader(url: string, title?: string) {
   );
 }
 
+function renderFormattedLine(text: string) {
+  const parts = text.split(/(\*\*.*?\*\*)/g);
+  return parts.map((part, index) => {
+    if (part.startsWith("**") && part.endsWith("**")) {
+      return (
+        <strong key={index} className="font-semibold text-zinc-100">
+          {part.slice(2, -2)}
+        </strong>
+      );
+    }
+    return part;
+  });
+}
+
 export function ArticleReaderDrawer() {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -76,6 +93,21 @@ export function ArticleReaderDrawer() {
   const [fontSerif, setFontSerif] = useState(false);
   const [tldr, setTldr] = useState<string | null>(null);
   const [tldrLoading, setTldrLoading] = useState(false);
+
+  const isBookmarkedCurrent = useSyncExternalStore(
+    subscribeToStorage,
+    () => (article?.url ? isBookmarked(article.url) : false),
+    () => false,
+  );
+
+  const handleClose = useCallback(() => {
+    setOpen(false);
+    setArticle(null);
+    setTldr(null);
+    if (typeof window !== "undefined" && window.getSelection) {
+      window.getSelection()?.removeAllRanges();
+    }
+  }, []);
 
   useEffect(() => {
     async function handleOpen(e: Event) {
@@ -114,7 +146,7 @@ export function ArticleReaderDrawer() {
 
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") {
-        setOpen(false);
+        handleClose();
       }
     }
 
@@ -124,7 +156,7 @@ export function ArticleReaderDrawer() {
       window.removeEventListener("devpulse.open-reader", handleOpen);
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, []);
+  }, [handleClose]);
 
   async function handleGenerateTldr() {
     if (!article) return;
@@ -144,28 +176,48 @@ export function ArticleReaderDrawer() {
         ? `Summarize this technical article for a senior software engineer in 3 concise bullet points. Focus on architectural decisions, trade-offs, and engineering takeaways.\n\nTitle: ${article.title}\nDomain: ${article.domain}\nContent: ${cleanText.slice(0, 3500)}`
         : `Provide a senior engineering takeaway and context for this technical topic based on its title and publisher summary in 3 concise bullet points.\n\nTitle: ${article.title}\nSource: ${article.domain}\nSummary: ${article.summary}`;
 
-      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
+      const CANDIDATE_MODELS = [
+        "gemini-2.5-flash",
+        "gemini-2.0-flash",
+        "gemini-1.5-flash",
+      ];
 
-      const res = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ role: "user", parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.3, maxOutputTokens: 300 },
-        }),
-      });
+      let generated: string | null = null;
+      let lastError: Error | null = null;
 
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error?.message || "Gemini summarization failed");
+      for (const model of CANDIDATE_MODELS) {
+        try {
+          const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
+          const res = await fetch(endpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            signal: AbortSignal.timeout(8000),
+            body: JSON.stringify({
+              contents: [{ role: "user", parts: [{ text: prompt }] }],
+              generationConfig: { temperature: 0.3, maxOutputTokens: 300 },
+            }),
+          });
+
+          const data = await res.json();
+          if (!res.ok) {
+            throw new Error(data.error?.message || `Model ${model} returned error`);
+          }
+
+          const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (text) {
+            generated = text;
+            break;
+          }
+        } catch (err) {
+          lastError = err instanceof Error ? err : new Error(String(err));
+        }
       }
 
-      const generated = data.candidates?.[0]?.content?.parts?.[0]?.text;
       if (generated) {
         setTldr(generated);
         toast.success("TL;DR engineering digest ready");
       } else {
-        throw new Error("No summary generated");
+        throw lastError || new Error("No summary generated");
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Summarization failed");
@@ -181,6 +233,26 @@ export function ArticleReaderDrawer() {
     }
   }
 
+  function handleToggleBookmark() {
+    if (!article) return;
+    const next = toggleBookmark({
+      id: article.url,
+      title: article.title,
+      url: article.url,
+      source:
+        article.sourceType === "github"
+          ? "GitHub"
+          : article.sourceType === "hackernews"
+            ? "Hacker News"
+            : article.sourceType === "devto"
+              ? "Dev.to"
+              : article.domain,
+      summary: article.summary,
+      tags: article.tags,
+    });
+    toast.success(next ? "Saved to Bookmarks" : "Removed from Bookmarks");
+  }
+
   if (!open) return null;
 
   const isFallbackView = Boolean(
@@ -191,7 +263,7 @@ export function ArticleReaderDrawer() {
   return (
     <div
       className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
-      onClick={() => setOpen(false)}
+      onClick={handleClose}
     >
       <div
         className="relative flex h-full w-full max-w-2xl sm:max-w-3xl flex-col border-l border-zinc-800 bg-zinc-950 shadow-2xl animate-in slide-in-from-right duration-200"
@@ -226,6 +298,19 @@ export function ArticleReaderDrawer() {
           <div className="flex items-center gap-1.5 font-mono text-xs">
             <button
               type="button"
+              onClick={handleToggleBookmark}
+              className={`flex size-8 items-center justify-center rounded-md border border-zinc-800 bg-zinc-900 transition-colors ${
+                isBookmarkedCurrent
+                  ? "text-amber-400 border-amber-500/40"
+                  : "text-zinc-400 hover:text-white"
+              }`}
+              title={isBookmarkedCurrent ? "Remove Bookmark" : "Save Bookmark"}
+            >
+              <Bookmark className={`size-3.5 ${isBookmarkedCurrent ? "fill-current" : ""}`} />
+            </button>
+
+            <button
+              type="button"
               onClick={() => setFontSerif(!fontSerif)}
               className="flex h-8 items-center gap-1.5 rounded-md border border-zinc-800 bg-zinc-900 px-2.5 text-zinc-300 hover:text-white transition-colors"
               title="Toggle Serif / Sans Font"
@@ -257,7 +342,7 @@ export function ArticleReaderDrawer() {
 
             <button
               type="button"
-              onClick={() => setOpen(false)}
+              onClick={handleClose}
               className="flex size-8 items-center justify-center rounded-md text-zinc-400 hover:bg-zinc-800 hover:text-white transition-colors ml-1"
               title="Close (Esc)"
             >
@@ -284,8 +369,14 @@ export function ArticleReaderDrawer() {
               {/* Header Info */}
               <div className="space-y-2 pb-4 border-b border-zinc-800/80">
                 <div className="flex flex-wrap items-center gap-2 text-xs font-mono text-zinc-400">
-                  <span className="text-zinc-200 font-medium">{article.author}</span>
-                  <span>•</span>
+                  {article.author &&
+                  article.author.toLowerCase() !== article.domain.toLowerCase() &&
+                  article.author.toLowerCase() !== "web" ? (
+                    <>
+                      <span className="text-zinc-200 font-medium">{article.author}</span>
+                      <span>•</span>
+                    </>
+                  ) : null}
                   <span>{article.domain}</span>
                   {article.tags && article.tags.length > 0 && (
                     <>
@@ -331,22 +422,28 @@ export function ArticleReaderDrawer() {
                           <GitFork className="size-3.5" />
                           {article.gitHubStats.forks.toLocaleString()}
                         </span>
-                        {article.gitHubStats.language && (
-                          <>
-                            <span>•</span>
-                            <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-zinc-300 border border-zinc-700/60 text-[11px]">
-                              {article.gitHubStats.language}
-                            </span>
-                          </>
-                        )}
-                        {article.gitHubStats.license && (
-                          <>
-                            <span>•</span>
-                            <span className="text-zinc-400 text-[11px]">
-                              {article.gitHubStats.license}
-                            </span>
-                          </>
-                        )}
+                        {article.gitHubStats.language &&
+                          !["null", "unknown"].includes(
+                            article.gitHubStats.language.toLowerCase(),
+                          ) && (
+                            <>
+                              <span>•</span>
+                              <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-zinc-300 border border-zinc-700/60 text-[11px]">
+                                {article.gitHubStats.language}
+                              </span>
+                            </>
+                          )}
+                        {article.gitHubStats.license &&
+                          !["noassertion", "null", "repository", "none"].includes(
+                            article.gitHubStats.license.toLowerCase(),
+                          ) && (
+                            <>
+                              <span>•</span>
+                              <span className="text-zinc-400 text-[11px]">
+                                {article.gitHubStats.license}
+                              </span>
+                            </>
+                          )}
                       </div>
                     )}
                   </div>
@@ -424,9 +521,27 @@ export function ArticleReaderDrawer() {
                   </button>
                 </div>
 
-                {tldr ? (
-                  <div className="font-mono text-sm leading-relaxed text-zinc-200 whitespace-pre-line pt-2 border-t border-zinc-800/60">
-                    {tldr}
+                {tldrLoading ? (
+                  <div className="space-y-2.5 pt-2 border-t border-zinc-800/60 animate-pulse">
+                    <div className="h-3.5 w-11/12 rounded bg-zinc-800" />
+                    <div className="h-3.5 w-4/5 rounded bg-zinc-800/70" />
+                    <div className="h-3.5 w-3/4 rounded bg-zinc-800/50" />
+                  </div>
+                ) : tldr ? (
+                  <div className="space-y-2 pt-2 border-t border-zinc-800/60 font-mono text-sm leading-relaxed text-zinc-200">
+                    {tldr
+                      .split("\n")
+                      .map((l) => l.trim())
+                      .filter((l) => l.length > 0)
+                      .map((line, idx) => {
+                        const cleanLine = line.replace(/^[*•-]\s*/, "");
+                        return (
+                          <div key={idx} className="flex items-start gap-2">
+                            <span className="text-zinc-500 select-none mt-0.5">•</span>
+                            <span className="flex-1">{renderFormattedLine(cleanLine)}</span>
+                          </div>
+                        );
+                      })}
                   </div>
                 ) : (
                   <p className="font-mono text-xs text-zinc-400 leading-relaxed">

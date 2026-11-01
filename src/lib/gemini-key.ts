@@ -1,3 +1,5 @@
+import { notifyStorageUpdate } from "@/lib/storage-bus";
+
 export const GEMINI_KEY_STORAGE_KEY = "devhub.gemini.apiKey";
 export const GEMINI_KEY_HEADER = "x-gemini-key";
 
@@ -18,10 +20,12 @@ export function writeGeminiKey(value: string) {
 
   if (!trimmed) {
     window.localStorage.removeItem(GEMINI_KEY_STORAGE_KEY);
+    notifyStorageUpdate("gemini");
     return;
   }
 
   window.localStorage.setItem(GEMINI_KEY_STORAGE_KEY, trimmed);
+  notifyStorageUpdate("gemini");
 }
 
 export function clearGeminiKey() {
@@ -30,6 +34,7 @@ export function clearGeminiKey() {
   }
 
   window.localStorage.removeItem(GEMINI_KEY_STORAGE_KEY);
+  notifyStorageUpdate("gemini");
 }
 
 export function geminiAuthHeaders(apiKey = readGeminiKey()) {
