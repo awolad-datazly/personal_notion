@@ -60,21 +60,25 @@ export function youtubeThumbnailUrl(videoId: string) {
 }
 
 export async function fetchYouTubeTitle(videoId: string) {
-  const endpoint = `https://www.youtube.com/oembed?url=${encodeURIComponent(
-    youtubeWatchUrl(videoId),
-  )}&format=json`;
+  try {
+    const endpoint = `https://www.youtube.com/oembed?url=${encodeURIComponent(
+      youtubeWatchUrl(videoId),
+    )}&format=json`;
 
-  const response = await fetch(endpoint, {
-    headers: { Accept: "application/json" },
-    next: { revalidate: 86400 },
-  });
+    const response = await fetch(endpoint, {
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(3000),
+    });
 
-  if (!response.ok) {
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = (await response.json()) as { title?: string };
+    return data.title?.trim() || null;
+  } catch {
     return null;
   }
-
-  const data = (await response.json()) as { title?: string };
-  return data.title?.trim() || null;
 }
 
 export function formatTimestamp(totalSeconds: number) {

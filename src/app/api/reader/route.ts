@@ -302,18 +302,18 @@ function parseDevToUrl(urlStr: string): { username: string; slug: string } | nul
   }
 }
 
-async function handleDevTo(username: string, slug: string, targetUrl: string): Promise<NextResponse | null> {
+async function handleDevTo(username: string, slug: string, targetUrl: string): Promise<NextResponse> {
   try {
     const res = await fetch(`https://dev.to/api/articles/${username}/${slug}`, {
       headers: { "User-Agent": "DevPulse-Reader/1.0" },
-      signal: AbortSignal.timeout(6000),
+      signal: AbortSignal.timeout(5000),
     });
 
-    if (!res.ok) return null;
+    if (!res.ok) throw new Error(`Dev.to API responded with ${res.status}`);
     const article = await res.json();
 
     const rawContent = article.body_html || article.body_markdown || "";
-    if (!rawContent) return null;
+    if (!rawContent) throw new Error("Empty Dev.to body content");
 
     const content = rawContent.replace(/<!--[\s\S]*?-->/g, "");
     const contentType = article.body_html ? "html" : "markdown";
@@ -343,7 +343,20 @@ async function handleDevTo(username: string, slug: string, targetUrl: string): P
 
     return NextResponse.json(payload);
   } catch {
-    return null;
+    return NextResponse.json({
+      title: cleanTitle(`Dev.to: ${slug.replace(/-/g, " ")}`),
+      author: username,
+      domain: "dev.to",
+      readTime: "3 min read",
+      summary: "Dev.to article could not be reached directly at this time (offline or host unreachable).",
+      content: "",
+      codeSnippets: [],
+      url: targetUrl,
+      sourceType: "devto",
+      contentType: "markdown",
+      isFallback: true,
+      fallbackReason: "Could not resolve dev.to or network connection timed out.",
+    });
   }
 }
 
@@ -493,8 +506,7 @@ export async function GET(request: Request) {
   // 2. Special Handler: Dev.to
   const devToArticle = parseDevToUrl(targetUrl);
   if (devToArticle) {
-    const devRes = await handleDevTo(devToArticle.username, devToArticle.slug, targetUrl);
-    if (devRes) return devRes;
+    return handleDevTo(devToArticle.username, devToArticle.slug, targetUrl);
   }
 
   // 3. Special Handler: Hacker News
