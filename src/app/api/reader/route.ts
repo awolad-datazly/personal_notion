@@ -566,6 +566,64 @@ async function handleHackerNews(id: string, targetUrl: string): Promise<NextResp
   }
 }
 
+function parseSubstackUrl(urlStr: string): { host: string; slug: string } | null {
+  try {
+    const parsed = new URL(urlStr);
+    const match = parsed.pathname.match(/\/p\/([^/?#]+)/);
+    if (!match) return null;
+    return { host: parsed.host, slug: match[1] };
+  } catch {
+    return null;
+  }
+}
+
+async function handleSubstack(host: string, slug: string, targetUrl: string): Promise<NextResponse | null> {
+  try {
+    const res = await fetch(`https://${host}/api/v1/posts/${slug}`, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) DevPulse-Reader/1.0",
+        Accept: "application/json",
+      },
+      signal: AbortSignal.timeout(8000),
+      next: { revalidate: 900 },
+    });
+
+    if (!res.ok) return null;
+    const post = await res.json();
+    if (!post || (!post.title && !post.body_html)) return null;
+
+    let bodyHtml = post.body_html || post.truncated_body_text || "";
+    if (post.cover_image && !bodyHtml.includes(post.cover_image)) {
+      bodyHtml = `<div class="mb-6"><img src="${post.cover_image}" alt="${post.title || "Cover"}" class="w-full rounded-lg max-h-[460px] object-cover" /></div>` + bodyHtml;
+    }
+
+    const safeHtml = injectBlankTargetToLinks(
+      DOMPurify.sanitize(bodyHtml, DOMPURIFY_CONFIG)
+    );
+
+    const author = post.publishedBylines?.[0]?.name || host;
+    const wordCount = safeHtml.replace(/<[^>]+>/g, " ").split(/\s+/).length;
+    const readTime = `${Math.max(1, Math.round(wordCount / 200))} min read`;
+
+    return NextResponse.json({
+      title: cleanTitle(post.title || "Substack Newsletter"),
+      author,
+      domain: host,
+      readTime,
+      summary: cleanTitle(post.subtitle || post.description || "Substack engineering deep dive."),
+      content: safeHtml,
+      htmlContent: safeHtml,
+      codeSnippets: [],
+      url: targetUrl,
+      sourceType: "article",
+      contentType: "html",
+      isFallback: false,
+    });
+  } catch {
+    return null;
+  }
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const targetUrl = searchParams.get("url")?.trim();
@@ -597,6 +655,13 @@ export async function GET(request: Request) {
   const hnId = parseHnUrl(targetUrl);
   if (hnId) {
     return handleHackerNews(hnId, targetUrl);
+  }
+
+  // 4. Special Handler: Substack Post
+  const substackPost = parseSubstackUrl(targetUrl);
+  if (substackPost) {
+    const subRes = await handleSubstack(substackPost.host, substackPost.slug, targetUrl);
+    if (subRes) return subRes;
   }
 
   // 4. Generic Article / Technical Blog Extractor

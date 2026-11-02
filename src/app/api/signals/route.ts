@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 export type SignalItem = {
   id: string;
-  source: "HN" | "GH" | "DEV";
+  source: "HN" | "GH" | "DEV" | "SUB";
   sourceName: string;
   title: string;
   takeaway: string;
@@ -11,9 +11,23 @@ export type SignalItem = {
   metrics: string;
   time: string;
   createdAt: string;
+  imageUrl?: string;
 };
 
 const FALLBACK_SIGNALS: SignalItem[] = [
+  {
+    id: "sub-fallback-1",
+    source: "SUB",
+    sourceName: "ByteByteGo",
+    title: "EP231: AI Terms You Need to Know (LLM Architecture & Serving)",
+    takeaway: "Visual breakdowns of PagedAttention, KV-cache compression, speculative decoding, and mixture-of-experts routing.",
+    category: "AI / Architecture",
+    url: "https://blog.bytebytego.com/p/ep231-ai-terms-you-need-to-know",
+    metrics: "219 likes • 42 comments",
+    time: "1h ago",
+    createdAt: new Date(Date.now() - 1 * 3600 * 1000).toISOString(),
+    imageUrl: "https://substackcdn.com/image/fetch/$s_!4n-C!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Fcfe11eb9-4763-408f-8292-93c70f52c133_2528x3376.jpeg",
+  },
   {
     id: "hn-fallback-1",
     source: "HN",
@@ -218,6 +232,8 @@ async function fetchDevTo(): Promise<SignalItem[]> {
       positive_reactions_count?: number;
       published_at?: string;
       tag_list?: string[];
+      cover_image?: string;
+      social_image?: string;
     }>;
 
     const mapped = articles.map((art) => {
@@ -237,6 +253,7 @@ async function fetchDevTo(): Promise<SignalItem[]> {
         metrics: `${art.positive_reactions_count ?? 0} reactions`,
         time: formatRelativeTime(itemDate),
         createdAt: itemDate.toISOString(),
+        imageUrl: art.cover_image || art.social_image || undefined,
       };
     });
 
@@ -305,29 +322,169 @@ async function fetchGitHubTrending(): Promise<SignalItem[]> {
   }
 }
 
+const SUBSTACK_PUBLICATIONS = [
+  { name: "ByteByteGo", domain: "blog.bytebytego.com", category: "System Design" },
+  { name: "The Pragmatic Engineer", domain: "newsletter.pragmaticengineer.com", category: "Engineering" },
+  { name: "System Design One", domain: "newsletter.systemdesign.one", category: "Architecture" },
+  { name: "Refactoring", domain: "refactoring.fm", category: "Engineering" },
+];
+
+const SUB_FALLBACK_SIGNALS: SignalItem[] = [
+  {
+    id: "sub-bytebytego-1",
+    source: "SUB",
+    sourceName: "ByteByteGo",
+    title: "EP231: AI Terms You Need to Know (LLM Architecture & Serving)",
+    takeaway: "Visual breakdowns of PagedAttention, KV-cache compression, speculative decoding, and mixture-of-experts routing.",
+    category: "AI / Architecture",
+    url: "https://blog.bytebytego.com/p/ep231-ai-terms-you-need-to-know",
+    metrics: "219 likes • 42 comments",
+    imageUrl: "https://substackcdn.com/image/fetch/$s_!4n-C!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Fcfe11eb9-4763-408f-8292-93c70f52c133_2528x3376.jpeg",
+    time: "2h ago",
+    createdAt: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
+  },
+  {
+    id: "sub-pragmatic-2",
+    source: "SUB",
+    sourceName: "The Pragmatic Engineer",
+    title: "The Pulse: Anthropic Kills the Coding Interview & Developer Productivity Shift",
+    takeaway: "Why AI is rendering LeetCode-style whiteboard loops obsolete and how top engineering teams are changing hiring.",
+    category: "Engineering",
+    url: "https://newsletter.pragmaticengineer.com/p/the-pulse-anthropic-kills-the-coding",
+    metrics: "310 likes • 84 comments",
+    imageUrl: "https://substackcdn.com/image/fetch/$s_!LqGQ!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F6ee9ba79-11ba-4402-ae9a-ba0f5ddc32fb_1200x675.png",
+    time: "4h ago",
+    createdAt: new Date(Date.now() - 4 * 3600 * 1000).toISOString(),
+  },
+  {
+    id: "sub-systemdesign-3",
+    source: "SUB",
+    sourceName: "System Design One",
+    title: "How to Cut Your Claude Code & LLM Token Usage by 60% with Smart Context Caching",
+    takeaway: "Practical architectural strategies to reduce prompt bloat and latency when running continuous AI workflows.",
+    category: "Architecture",
+    url: "https://newsletter.systemdesign.one/p/claude-code-token-usage",
+    metrics: "165 likes • 28 comments",
+    imageUrl: "https://substack-post-media.s3.amazonaws.com/public/images/3008c11a-7221-4f36-9b16-ef12fe7fc054_1200x675.png",
+    time: "6h ago",
+    createdAt: new Date(Date.now() - 6 * 3600 * 1000).toISOString(),
+  },
+  {
+    id: "sub-bytebytego-4",
+    source: "SUB",
+    sourceName: "ByteByteGo",
+    title: "Data Movement Strategies in System Design: CDC vs Dual-Write vs Event Sourcing",
+    takeaway: "Comparative architectural analysis of Debezium change data capture, transactional outbox, and batch replication.",
+    category: "Database",
+    url: "https://blog.bytebytego.com/p/data-movement-strategies-in-system",
+    metrics: "192 likes • 31 comments",
+    imageUrl: "https://substackcdn.com/image/fetch/$s_!FdGE!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F0ef0e54a-50c5-4d7a-b5ea-7a133f938f71_1200x675.jpeg",
+    time: "8h ago",
+    createdAt: new Date(Date.now() - 8 * 3600 * 1000).toISOString(),
+  },
+];
+
+async function fetchSubstack(): Promise<SignalItem[]> {
+  try {
+    const results = await Promise.allSettled(
+      SUBSTACK_PUBLICATIONS.map(async (pub) => {
+        try {
+          const res = await fetch(`https://${pub.domain}/api/v1/posts?limit=3`, {
+            signal: AbortSignal.timeout(6000),
+            headers: {
+              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) DevPulse-Reader/1.0",
+              Accept: "application/json",
+            },
+            next: { revalidate: 900 },
+          });
+
+          if (!res.ok) return [];
+          const data = (await res.json()) as {
+            posts?: Array<{
+              id: number;
+              title: string;
+              subtitle?: string;
+              description?: string;
+              canonical_url: string;
+              cover_image?: string;
+              post_date?: string;
+              reaction_count?: number;
+              comment_count?: number;
+            }>;
+          };
+
+          const posts = data.posts || [];
+          return posts.map((post) => {
+            const itemDate = post.post_date ? new Date(post.post_date) : new Date();
+            const reactions = post.reaction_count ?? 0;
+            const comments = post.comment_count ?? 0;
+            const metrics = comments > 0
+              ? `${reactions} likes • ${comments} comments`
+              : `${reactions} likes`;
+
+            return {
+              id: `sub-${pub.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${post.id}`,
+              source: "SUB" as const,
+              sourceName: pub.name,
+              title: post.title,
+              takeaway: post.subtitle || post.description || `In-depth technical architecture newsletter from ${pub.name}.`,
+              category: detectCategory(post.title, pub.category),
+              url: post.canonical_url,
+              metrics,
+              time: formatRelativeTime(itemDate),
+              createdAt: itemDate.toISOString(),
+              imageUrl: post.cover_image || undefined,
+            };
+          });
+        } catch {
+          return [];
+        }
+      })
+    );
+
+    const allPubPosts: SignalItem[] = [];
+    for (const r of results) {
+      if (r.status === "fulfilled" && r.value.length > 0) {
+        allPubPosts.push(...r.value);
+      }
+    }
+
+    if (allPubPosts.length === 0) {
+      return SUB_FALLBACK_SIGNALS;
+    }
+
+    allPubPosts.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return allPubPosts.slice(0, 8);
+  } catch {
+    return SUB_FALLBACK_SIGNALS;
+  }
+}
+
 export async function GET() {
   const results = await Promise.allSettled([
     fetchHackerNews(),
     fetchDevTo(),
     fetchGitHubTrending(),
+    fetchSubstack(),
   ]);
 
   const hnSignals = results[0].status === "fulfilled" ? results[0].value : [];
   const devSignals = results[1].status === "fulfilled" ? results[1].value : [];
   const ghSignals = results[2].status === "fulfilled" ? results[2].value : [];
+  const subSignals = results[3].status === "fulfilled" ? results[3].value : [];
 
-  let allSignals: SignalItem[] = [...hnSignals, ...devSignals, ...ghSignals];
+  let allSignals: SignalItem[] = [...hnSignals, ...devSignals, ...ghSignals, ...subSignals];
 
   if (allSignals.length === 0) {
     allSignals = FALLBACK_SIGNALS;
   } else {
-    // Interleave signals nicely: HN, GH, DEV
+    // Interleave signals by date
     allSignals.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }
 
   return NextResponse.json({
     signals: allSignals,
     refreshedAt: new Date().toISOString(),
-    isLive: hnSignals.length > 0 || devSignals.length > 0 || ghSignals.length > 0,
+    isLive: hnSignals.length > 0 || devSignals.length > 0 || ghSignals.length > 0 || subSignals.length > 0,
   });
 }

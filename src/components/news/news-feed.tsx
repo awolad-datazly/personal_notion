@@ -17,7 +17,7 @@ export function NewsFeed({
   canSummarize: boolean;
 }) {
   const [activeIndex, setActiveIndex] = useState(0);
-  const [filter, setFilter] = useState<"all" | "must-learn" | "hn" | "gh" | "dev">("all");
+  const [filter, setFilter] = useState<"all" | "must-learn" | "hn" | "gh" | "dev" | "sub">("all");
   const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({});
 
   const visible = useMemo(() => {
@@ -26,6 +26,18 @@ export function NewsFeed({
       if (filter === "hn") return item.category?.toLowerCase().includes("hacker") || item.url.includes("ycombinator");
       if (filter === "gh") return item.category?.toLowerCase().includes("github") || item.url.includes("github");
       if (filter === "dev") return item.category?.toLowerCase().includes("dev") || item.url.includes("dev.to");
+      if (filter === "sub") {
+        const lowerUrl = item.url.toLowerCase();
+        const lowerCat = (item.category || "").toLowerCase();
+        return (
+          lowerCat.includes("substack") ||
+          lowerUrl.includes("substack") ||
+          lowerUrl.includes("bytebytego") ||
+          lowerUrl.includes("pragmaticengineer") ||
+          lowerUrl.includes("systemdesign.one") ||
+          lowerUrl.includes("refactoring.fm")
+        );
+      }
       return true;
     });
   }, [filter, items]);
@@ -75,6 +87,7 @@ export function NewsFeed({
             { id: "hn", label: "HN" },
             { id: "gh", label: "GitHub" },
             { id: "dev", label: "Dev.to" },
+            { id: "sub", label: "Substack" },
           ].map((tab) => (
             <button
               key={tab.id}

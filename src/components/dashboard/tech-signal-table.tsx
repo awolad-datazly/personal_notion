@@ -10,7 +10,7 @@ import { subscribeToStorage } from "@/lib/storage-bus";
 
 export type SignalItem = {
   id: string;
-  source: "HN" | "GH" | "DEV";
+  source: "HN" | "GH" | "DEV" | "SUB";
   sourceName: string;
   title: string;
   takeaway: string;
@@ -19,9 +19,23 @@ export type SignalItem = {
   metrics: string;
   time: string;
   createdAt: string;
+  imageUrl?: string;
 };
 
 const INITIAL_SIGNALS: SignalItem[] = [
+  {
+    id: "sig-sub-1",
+    source: "SUB",
+    sourceName: "ByteByteGo",
+    title: "EP231: AI Terms You Need to Know (LLM Architecture & Serving)",
+    takeaway: "Visual breakdowns of PagedAttention, KV-cache compression, speculative decoding, and mixture-of-experts routing.",
+    category: "AI / Architecture",
+    url: "https://blog.bytebytego.com/p/ep231-ai-terms-you-need-to-know",
+    metrics: "219 likes • 42 comments",
+    imageUrl: "https://substackcdn.com/image/fetch/$s_!4n-C!,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Fcfe11eb9-4763-408f-8292-93c70f52c133_2528x3376.jpeg",
+    time: "1h ago",
+    createdAt: new Date().toISOString(),
+  },
   {
     id: "sig-1",
     source: "HN",
@@ -119,7 +133,7 @@ function SignalBookmarkButton({ item }: { item: SignalItem }) {
 
 export function TechSignalTable() {
   const [signals, setSignals] = useState<SignalItem[]>(INITIAL_SIGNALS);
-  const [filter, setFilter] = useState<"ALL" | "HN" | "GH" | "DEV">("ALL");
+  const [filter, setFilter] = useState<"ALL" | "HN" | "GH" | "DEV" | "SUB">("ALL");
   const [loading, setLoading] = useState(false);
   const [isLive, setIsLive] = useState(false);
 
@@ -203,7 +217,7 @@ export function TechSignalTable() {
         </div>
 
         <div className="flex items-center gap-1.5 font-mono text-xs">
-          {(["ALL", "HN", "GH", "DEV"] as const).map((tab) => (
+          {(["ALL", "HN", "GH", "DEV", "SUB"] as const).map((tab) => (
             <button
               key={tab}
               type="button"
@@ -214,7 +228,7 @@ export function TechSignalTable() {
                   : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-850"
               }`}
             >
-              {tab}
+              {tab === "SUB" ? "Substack" : tab}
             </button>
           ))}
           <Link
@@ -232,11 +246,21 @@ export function TechSignalTable() {
         {filtered.map((item) => (
           <div
             key={item.id}
-            className="group relative flex items-start justify-between gap-4 p-4 transition-colors hover:bg-zinc-850/40"
+            className="group relative flex items-start justify-between gap-3 sm:gap-4 p-4 transition-colors hover:bg-zinc-850/40"
           >
             <div className="min-w-0 flex-1 space-y-2">
               <div className="flex items-start gap-2.5">
-                <span className="font-mono text-xs font-semibold uppercase tracking-wide px-2 py-0.5 rounded bg-zinc-800/90 text-zinc-200 border border-zinc-700/60 shrink-0 mt-0.5">
+                <span
+                  className={`font-mono text-xs font-semibold uppercase tracking-wide px-2 py-0.5 rounded border shrink-0 mt-0.5 ${
+                    item.source === "SUB"
+                      ? "bg-orange-500/15 text-orange-400 border-orange-500/30"
+                      : item.source === "DEV"
+                      ? "bg-emerald-950/40 text-emerald-400 border-emerald-500/30"
+                      : item.source === "HN"
+                      ? "bg-amber-950/40 text-amber-400 border-amber-500/30"
+                      : "bg-zinc-800/90 text-zinc-200 border-zinc-700/60"
+                  }`}
+                >
                   {item.source}
                 </span>
 
@@ -249,7 +273,7 @@ export function TechSignalTable() {
                 </button>
               </div>
 
-              <p className="text-sm md:text-[15px] text-zinc-300 leading-relaxed pl-10">
+              <p className="text-sm md:text-[15px] text-zinc-300 leading-relaxed pl-10 line-clamp-2 sm:line-clamp-3">
                 {item.takeaway}
               </p>
 
@@ -264,29 +288,50 @@ export function TechSignalTable() {
               </div>
             </div>
 
-            {/* Hover Actions */}
-            <div className="flex items-center gap-2 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity pt-0.5">
-              <SignalBookmarkButton item={item} />
+            {/* Right Side: Cover Image Thumbnail (if present) + Actions */}
+            <div className="flex items-start gap-2.5 sm:gap-3 shrink-0">
+              {item.imageUrl ? (
+                <button
+                  type="button"
+                  onClick={() => openArticleReader(item.url, item.title)}
+                  className="relative shrink-0 w-20 h-16 sm:w-28 sm:h-20 md:w-32 md:h-22 rounded-lg overflow-hidden border border-zinc-800/90 bg-zinc-950 group-hover:border-zinc-700 transition-all cursor-pointer shadow-xs focus:outline-none focus:ring-1 focus:ring-zinc-600"
+                  title="Open in Reader"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={item.imageUrl}
+                    alt=""
+                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                    loading="lazy"
+                    referrerPolicy="no-referrer"
+                  />
+                </button>
+              ) : null}
 
-              <button
-                type="button"
-                onClick={() => openArticleReader(item.url, item.title)}
-                className="flex h-9 items-center gap-1.5 rounded-md border border-zinc-700/70 bg-zinc-800 px-3 text-sm font-medium text-zinc-200 hover:bg-zinc-700 hover:text-white transition-colors shadow-xs active:scale-[0.98]"
-                title="Read in Slide-Over Drawer"
-              >
-                <BookOpen className="size-4 text-zinc-400" />
-                <span>Read</span>
-              </button>
+              {/* Hover Actions */}
+              <div className="hidden sm:flex items-center gap-1.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity pt-0.5">
+                <SignalBookmarkButton item={item} />
 
-              <a
-                href={item.url}
-                target="_blank"
-                rel="noreferrer"
-                className="flex h-9 items-center gap-1 rounded-md border border-zinc-700/70 bg-zinc-800 px-2.5 text-sm font-medium text-zinc-400 hover:bg-zinc-700 hover:text-white transition-colors shadow-xs"
-                title="Open original website"
-              >
-                <ArrowUpRight className="size-4" />
-              </a>
+                <button
+                  type="button"
+                  onClick={() => openArticleReader(item.url, item.title)}
+                  className="flex h-9 items-center gap-1.5 rounded-md border border-zinc-700/70 bg-zinc-800 px-3 text-sm font-medium text-zinc-200 hover:bg-zinc-700 hover:text-white transition-colors shadow-xs active:scale-[0.98]"
+                  title="Read in Slide-Over Drawer"
+                >
+                  <BookOpen className="size-4 text-zinc-400" />
+                  <span>Read</span>
+                </button>
+
+                <a
+                  href={item.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex h-9 items-center gap-1 rounded-md border border-zinc-700/70 bg-zinc-800 px-2.5 text-sm font-medium text-zinc-400 hover:bg-zinc-700 hover:text-white transition-colors shadow-xs"
+                  title="Open original website"
+                >
+                  <ArrowUpRight className="size-4" />
+                </a>
+              </div>
             </div>
           </div>
         ))}
