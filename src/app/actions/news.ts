@@ -21,7 +21,7 @@ async function requireNewsAccess() {
 
   if (!hasDatabaseUrl()) {
     throw new Error(
-      "DATABASE_URL is not set. Add your Neon connection string to .env.local.",
+      "DATABASE_URL is not set. Add your Supabase Postgres connection string to .env.local.",
     );
   }
 
@@ -47,7 +47,7 @@ export async function refreshNewsFeedAction(
     if (!hasDatabaseUrl()) {
       return {
         error:
-          "DATABASE_URL is not set. Add your Neon connection string first.",
+          "DATABASE_URL is not set. Add your Supabase Postgres connection string first.",
       };
     }
 

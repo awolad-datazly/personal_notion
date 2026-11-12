@@ -8,6 +8,7 @@ import Google from "next-auth/providers/google";
 
 import { getDb } from "@/db";
 import { sessions, users, accounts } from "@/db/schema";
+import { googleEmailVerified } from "@/lib/auth-errors";
 import { roleForEmail } from "@/lib/roles";
 
 const adapterMethods = [
@@ -114,7 +115,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         return false;
       }
 
-      return profile?.email_verified === true;
+      return googleEmailVerified(profile?.email_verified);
     },
     async session({ session, user }) {
       const role = roleForEmail(user.email);

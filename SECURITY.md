@@ -37,7 +37,7 @@ Personal Notion is a **single-admin / small-team** hub. The main risks are:
 - Never commit `.env`, `.env.local`, or `.env.docker`
 - Generate `AUTH_SECRET` with `openssl rand -base64 32`
 - Restrict Google OAuth client to your exact `AUTH_URL` redirect URI
-- Use Neon pooled URL with TLS (`sslmode=require`)
+- Use the Supabase transaction pooler URL with TLS (`sslmode=require`) for `DATABASE_URL`
 - Rotate Google client secret and Auth secret if either leaks
 - Gemini keys stay in the browser (`x-gemini-key`); they are never stored server-side
 

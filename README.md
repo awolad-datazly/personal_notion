@@ -2,21 +2,39 @@
 
 Distraction-free personal tech hub: auth-gated modules, Video Vault, News Radar, and BYOK Gemini summaries.
 
-Stack: **Next.js 16** (App Router, Cache Components), **React 19**, **Auth.js**, **Drizzle + Neon**, **Tailwind v4**, **pnpm**.
+Stack: **Next.js 16** (App Router, Cache Components), **React 19**, **Auth.js (Google)**, **Drizzle + Supabase Postgres**, **Tailwind v4**, **pnpm**.
 
 ## Local development
 
 ```bash
 pnpm install
 cp .env.example .env.local
-# fill DATABASE_URL, AUTH_SECRET, Google OAuth, AUTH_ADMIN_EMAIL
+# fill DATABASE_URL, DIRECT_URL, AUTH_SECRET, Google OAuth, AUTH_ADMIN_EMAIL
 pnpm db:migrate
 pnpm dev
 ```
 
-Scripts: `pnpm lint`, `pnpm typecheck`, `pnpm build`, `pnpm db:studio`.
+Sign in from the header with Google. The redirect URI is `{AUTH_URL}/api/auth/callback/google`.
 
-Google OAuth redirect: `{AUTH_URL}/api/auth/callback/google`.
+Scripts: `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`, `pnpm db:studio`.
+
+## Vercel + Supabase
+
+1. In Supabase, copy the **transaction pooler** URI (port 6543) into Vercel as `DATABASE_URL`.
+2. Copy the **direct** URI (port 5432) into `.env.local` as `DIRECT_URL`, then run `pnpm db:migrate` once from your machine.
+3. In Google Cloud, create an OAuth client and set the redirect URI to `https://<your-vercel-domain>/api/auth/callback/google`.
+4. In Vercel project settings, set:
+
+| Name | Value |
+| --- | --- |
+| `DATABASE_URL` | Supabase transaction pooler URI |
+| `AUTH_SECRET` | `openssl rand -base64 32` |
+| `AUTH_URL` | `https://<your-vercel-domain>` (no trailing slash) |
+| `AUTH_GOOGLE_ID` | Google client id |
+| `AUTH_GOOGLE_SECRET` | Google client secret |
+| `AUTH_ADMIN_EMAIL` | The Google account that should be admin |
+
+`AUTH_TRUST_HOST` is already enabled in the app. Preview deployments use a different host, so Google sign-in works on the production domain you registered.
 
 ## Docker
 

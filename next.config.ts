@@ -9,7 +9,8 @@ import {
 const isDev = process.env.NODE_ENV === "development";
 
 const nextConfig: NextConfig = {
-  output: "standalone",
+  // Docker builds a standalone server. Vercel uses its own output.
+  ...(process.env.VERCEL ? {} : { output: "standalone" as const }),
   poweredByHeader: false,
   experimental: {
     agentFeedback: true,

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { Suspense } from "react";
 
+import { AuthStatusBanner } from "@/components/auth/auth-status-banner";
 import { FeatureGate } from "@/components/feature-flags/feature-gate";
 import { HeaderBar } from "@/components/shell/header-bar";
 import { getVisibleNavItems } from "@/components/shell/nav-items";
@@ -63,6 +64,10 @@ async function ShellChrome({ children }: { children: React.ReactNode }) {
           bookmarkCount={bookmarkCount}
           userMenu={<UserMenu />}
         />
+
+        <Suspense fallback={null}>
+          <AuthStatusBanner />
+        </Suspense>
 
         <div className="flex-1">{children}</div>
       </div>

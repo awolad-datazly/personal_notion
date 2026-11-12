@@ -22,8 +22,16 @@ export function toActionOriginHost(value: string): string | null {
 export function allowedOrigins(
   env: NodeJS.ProcessEnv = process.env,
 ): string[] {
-  const raw =
-    env.ALLOWED_ORIGINS ?? env.AUTH_URL ?? env.NEXTAUTH_URL ?? "";
+  const raw = [
+    env.ALLOWED_ORIGINS,
+    env.AUTH_URL,
+    env.NEXTAUTH_URL,
+    env.VERCEL_PROJECT_PRODUCTION_URL,
+    env.VERCEL_BRANCH_URL,
+    env.VERCEL_URL,
+  ]
+    .filter((value): value is string => Boolean(value?.trim()))
+    .join(",");
 
   const hosts = raw
     .split(",")

@@ -9,7 +9,10 @@ export default defineConfig({
   out: "./drizzle",
   dialect: "postgresql",
   dbCredentials: {
+    // Migrations need a direct Postgres session. Supabase's transaction
+    // pooler (port 6543) is for the running app, not for drizzle-kit.
     url:
+      process.env.DIRECT_URL ??
       process.env.DATABASE_URL ??
       "postgresql://user:password@localhost:5432/personal_notion",
   },

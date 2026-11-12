@@ -3,25 +3,11 @@ import { connection } from "next/server";
 import { auth, signIn, signOut } from "@/auth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { authErrorMessage } from "@/lib/auth-errors";
 import { isGoogleAuthConfigured } from "@/lib/roles";
 
 function firstParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
-}
-
-function authErrorMessage(code: string | undefined) {
-  switch (code) {
-    case "AccessDenied":
-      return "That Google account cannot sign in. Use a verified Google email.";
-    case "Configuration":
-      return "Google sign-in is missing its client id or secret.";
-    case "OAuthAccountNotLinked":
-      return "This email is already linked to a different sign-in.";
-    case undefined:
-      return null;
-    default:
-      return "Sign-in did not complete. Try again.";
-  }
 }
 
 function GoogleIcon({ className }: { className?: string }) {
