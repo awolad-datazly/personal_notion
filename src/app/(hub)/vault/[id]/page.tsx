@@ -7,6 +7,7 @@ import { LearningWorkspace } from "@/components/vault/learning-workspace";
 import { hasDatabaseUrl } from "@/db";
 import { requireFeature } from "@/lib/module-access";
 import { requireUser } from "@/lib/session";
+import { touchResource } from "@/lib/library/data";
 import { getVaultVideo } from "@/lib/vault/data";
 
 async function VaultSessionContent({
@@ -34,6 +35,8 @@ async function VaultSessionContent({
   if (!item || !item.videoId) {
     notFound();
   }
+
+  await touchResource(session.user.id, item.id);
 
   return (
     <LearningWorkspace

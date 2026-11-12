@@ -17,6 +17,8 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+
+import { readScratchpadAction } from "@/app/actions/library";
 import { toast } from "@/components/ui/toast";
 
 export function openCommandPalette() {
@@ -170,13 +172,14 @@ export function CommandPalette() {
       category: "Actions",
       icon: FileText,
       action: () => {
-        const notes = localStorage.getItem("devpulse.scratchpad") || "";
-        if (notes) {
-          navigator.clipboard.writeText(notes);
+        void readScratchpadAction().then(async (notes) => {
+          if (!notes) {
+            toast.info("Scratchpad is empty");
+            return;
+          }
+          await navigator.clipboard.writeText(notes);
           toast.success("Scratchpad notes copied to clipboard");
-        } else {
-          toast.info("Scratchpad is empty");
-        }
+        });
       },
     },
     {

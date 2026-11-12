@@ -15,7 +15,11 @@ import {
 
 export const userRoleEnum = pgEnum("user_role", ["ADMIN", "USER"]);
 export type UserRole = (typeof userRoleEnum.enumValues)[number];
-export const resourceTypeEnum = pgEnum("resource_type", ["YOUTUBE", "ARTICLE"]);
+export const resourceTypeEnum = pgEnum("resource_type", [
+  "YOUTUBE",
+  "ARTICLE",
+  "NOTE",
+]);
 export const resourceStatusEnum = pgEnum("resource_status", [
   "TO_READ",
   "COMPLETED",
@@ -93,6 +97,11 @@ export const resources = pgTable(
     title: text("title").notNull(),
     domain: text("domain"),
     status: resourceStatusEnum("status").notNull().default("TO_READ"),
+    bookmarked: boolean("bookmarked").notNull().default(false),
+    lastOpenedAt: timestamp("last_opened_at", {
+      withTimezone: true,
+      mode: "date",
+    }),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
       .notNull()
       .defaultNow(),
@@ -100,6 +109,9 @@ export const resources = pgTable(
   (table) => [
     index("resources_user_id_idx").on(table.userId),
     index("resources_user_status_idx").on(table.userId, table.status),
+    uniqueIndex("resources_user_url_unique").on(table.userId, table.url),
+    index("resources_user_bookmarked_idx").on(table.userId, table.bookmarked),
+    index("resources_user_last_opened_idx").on(table.userId, table.lastOpenedAt),
   ],
 );
 

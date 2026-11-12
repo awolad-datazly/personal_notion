@@ -45,6 +45,7 @@ export async function addVaultVideoAction(
     const item = await createVaultVideo(session.user.id, url);
 
     revalidatePath("/vault");
+    revalidatePath("/");
     redirect(`/vault/${item.id}`);
   } catch (error) {
     if (

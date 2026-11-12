@@ -21,9 +21,11 @@ const ROUTE_LABELS: Record<string, string> = {
 
 export function HeaderBar({
   items,
+  bookmarkCount = 0,
   userMenu,
 }: {
   items: NavItem[];
+  bookmarkCount?: number;
   userMenu: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -34,7 +36,7 @@ export function HeaderBar({
   return (
     <header className="sticky top-0 z-30 flex h-14 w-full items-center justify-between border-b border-zinc-800/80 bg-zinc-950/85 px-6 sm:px-8 backdrop-blur-md">
       <div className="flex items-center gap-3">
-        <MobileNav items={items} />
+        <MobileNav items={items} bookmarkCount={bookmarkCount} />
         <div className="flex items-center gap-2 text-sm">
           <span className="font-mono text-zinc-400">Workspace</span>
           <span className="text-zinc-600">/</span>

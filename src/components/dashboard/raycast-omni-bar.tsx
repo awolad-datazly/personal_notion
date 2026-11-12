@@ -3,26 +3,23 @@
 import { ArrowRight, CornerDownLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+
+import { captureLinkAction } from "@/app/actions/library";
 import { openArticleReader } from "@/components/reader/article-reader-drawer";
 import { toast } from "@/components/ui/toast";
-import { extractYouTubeId } from "@/lib/youtube";
-import { saveStudySession } from "@/lib/study-storage";
 
 const QUICK_ACTIONS = [
   {
     label: "Go & gRPC Microservices (YouTube)",
     url: "https://www.youtube.com/watch?v=kYv_8w4-f-M",
-    type: "video",
   },
   {
     label: "Next.js 16 Deep Dive (YouTube)",
     url: "https://www.youtube.com/watch?v=T_8N_b37Q6M",
-    type: "video",
   },
   {
-    label: "PostgreSQL 100M Rows Migration (Blog)",
+    label: "PostgreSQL migrations (Blog)",
     url: "https://dev.to/tech/zero-downtime-database-migrations-at-scale",
-    type: "article",
   },
 ];
 
@@ -32,66 +29,39 @@ export function RaycastOmniBar() {
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  async function handleExecute(targetUrl?: string) {
+  function handleExecute(targetUrl?: string) {
     const raw = (targetUrl ?? query).trim();
     if (!raw) {
-      setError("Enter a YouTube URL or technical blog link to inspect");
+      setError("Paste a YouTube URL or an article link");
       return;
     }
 
     setError(null);
-    const ytId = extractYouTubeId(raw);
-
-    if (ytId) {
-      toast.success("Launching Study Workspace...");
-      // Pre-save session so it is immediately visible in study sessions
-      let resolvedTitle = "YouTube Study Session";
-      const matchedAction = QUICK_ACTIONS.find((a) => a.url.includes(ytId));
-      if (matchedAction) {
-        resolvedTitle = matchedAction.label.replace(/\s*\(YouTube\)$/, "");
+    startTransition(async () => {
+      const result = await captureLinkAction(raw);
+      if ("error" in result) {
+        setError(result.error);
+        return;
       }
 
-      saveStudySession({
-        videoId: ytId,
-        title: resolvedTitle,
-      });
+      if (result.kind === "youtube") {
+        toast.success("Saved to your vault");
+        router.push(result.href);
+        return;
+      }
 
-      startTransition(() => {
-        router.push(`/vault?watch=${encodeURIComponent(ytId)}`);
-      });
-
-      // Try fetching official oEmbed title in background to enrich metadata
-      fetch(`/api/youtube?id=${ytId}`)
-        .then((res) => (res.ok ? res.json() : null))
-        .then((data) => {
-          if (data?.title) {
-            saveStudySession({
-              videoId: ytId,
-              title: data.title,
-            });
-          }
-        })
-        .catch(() => {});
-      return;
-    }
-
-    if (raw.startsWith("http://") || raw.startsWith("https://")) {
-      toast.info("Opening Article Reader...");
-      openArticleReader(raw);
-      return;
-    }
-
-    // Default: search filter
-    startTransition(() => {
-      router.push(`/radar?search=${encodeURIComponent(raw)}`);
+      toast.success("Saved to your reader");
+      openArticleReader(result.url);
+      setQuery("");
+      router.refresh();
     });
   }
 
   return (
     <div className="w-full space-y-2.5">
       <form
-        onSubmit={(e) => {
-          e.preventDefault();
+        onSubmit={(event) => {
+          event.preventDefault();
           handleExecute();
         }}
         className="group relative flex h-12 w-full items-center rounded-lg border border-zinc-800 bg-zinc-900/90 px-4 shadow-sm transition-colors focus-within:border-zinc-600"
@@ -103,11 +73,11 @@ export function RaycastOmniBar() {
           id="omni-input"
           type="text"
           value={query}
-          onChange={(e) => {
-            setQuery(e.target.value);
+          onChange={(event) => {
+            setQuery(event.target.value);
             if (error) setError(null);
           }}
-          placeholder="Paste YouTube tutorial, technical blog URL, or search..."
+          placeholder="Paste a YouTube tutorial or technical article URL..."
           className="h-full flex-1 bg-transparent font-mono text-base text-zinc-100 placeholder:text-zinc-400 focus:outline-hidden"
         />
 
@@ -121,7 +91,7 @@ export function RaycastOmniBar() {
             disabled={isPending}
             className="flex h-9 items-center gap-1.5 rounded-md bg-zinc-100 px-4 text-sm font-medium text-zinc-950 transition-colors hover:bg-white disabled:opacity-50"
           >
-            <span>{isPending ? "Resolving reality…" : "Open"}</span>
+            <span>{isPending ? "Saving…" : "Open"}</span>
             <ArrowRight className="size-4" />
           </button>
         </div>
@@ -132,7 +102,7 @@ export function RaycastOmniBar() {
       ) : null}
 
       <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 pl-1 text-xs font-mono text-zinc-300">
-        <span className="text-zinc-400">Quick load:</span>
+        <span className="text-zinc-400">Save:</span>
         {QUICK_ACTIONS.map((action) => (
           <button
             key={action.label}

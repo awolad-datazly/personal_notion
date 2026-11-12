@@ -115,8 +115,12 @@ export function NewsFeed({
       </div>
 
       {visible.length === 0 ? (
-        <div className="rounded-lg border border-zinc-800/80 bg-zinc-900/30 p-8 text-center">
-          <p className="font-mono text-sm text-zinc-400">No stories matching filter.</p>
+        <div className="rounded-lg border border-dashed border-zinc-800 bg-zinc-900/30 p-8 text-center">
+          <p className="font-mono text-sm text-zinc-400">
+            {items.length === 0
+              ? "The radar is empty. Refresh to pull stories into your library."
+              : "No stories matching this filter."}
+          </p>
         </div>
       ) : (
         <div className="overflow-hidden rounded-lg border border-zinc-800/80 bg-zinc-900/30 divide-y divide-zinc-800/60">

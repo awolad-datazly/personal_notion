@@ -13,7 +13,9 @@ import { CommandPalette } from "@/components/shell/command-palette";
 import { ToastContainer } from "@/components/ui/toast";
 import { ArticleReaderDrawer } from "@/components/reader/article-reader-drawer";
 import { DevStatusFooter } from "@/components/shell/dev-status-footer";
+import { hasDatabaseUrl } from "@/db";
 import { auth } from "@/auth";
+import { countBookmarks } from "@/lib/library/data";
 
 async function ShellChrome({ children }: { children: React.ReactNode }) {
   await connection();
@@ -21,6 +23,15 @@ async function ShellChrome({ children }: { children: React.ReactNode }) {
   const session = await auth();
   const role = session?.user.role ?? null;
   const items = await getVisibleNavItems(role);
+  let bookmarkCount = 0;
+
+  if (session?.user.id && hasDatabaseUrl()) {
+    try {
+      bookmarkCount = await countBookmarks(session.user.id);
+    } catch {
+      bookmarkCount = 0;
+    }
+  }
 
   return (
     <div className="flex min-h-full flex-1 bg-zinc-950 text-zinc-100">
@@ -39,7 +50,7 @@ async function ShellChrome({ children }: { children: React.ReactNode }) {
         </div>
 
         <div className="flex-1 overflow-y-auto">
-          <SidebarNav items={items} />
+          <SidebarNav items={items} bookmarkCount={bookmarkCount} />
         </div>
 
         <DevStatusFooter />
@@ -47,7 +58,11 @@ async function ShellChrome({ children }: { children: React.ReactNode }) {
 
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Header Bar */}
-        <HeaderBar items={items} userMenu={<UserMenu />} />
+        <HeaderBar
+          items={items}
+          bookmarkCount={bookmarkCount}
+          userMenu={<UserMenu />}
+        />
 
         <div className="flex-1">{children}</div>
       </div>

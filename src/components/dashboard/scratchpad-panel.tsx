@@ -1,49 +1,48 @@
 "use client";
 
 import { Check, Copy, Trash2 } from "lucide-react";
-import { useSyncExternalStore, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
-const STORAGE_KEY = "devpulse.scratchpad";
-const DEFAULT_TEXT = `# Quick Notes & Code Snippets
-- [ ] Review Raft consensus election timeouts
-- [ ] Benchmark zero-copy buffer allocations in Rust
-- Ref: https://v8.dev/blog/fast-properties
-`;
+import { saveScratchpadAction, toggleBookmarkAction } from "@/app/actions/library";
+import { toast } from "@/components/ui/toast";
+import { SCRATCHPAD_URL } from "@/lib/library/urls";
 
-function getSnapshot(): string {
-  if (typeof window === "undefined") {
-    return DEFAULT_TEXT;
-  }
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    return saved !== null ? saved : DEFAULT_TEXT;
-  } catch {
-    return DEFAULT_TEXT;
-  }
-}
-
-function subscribe(callback: () => void) {
-  window.addEventListener("storage", callback);
-  return () => window.removeEventListener("storage", callback);
-}
-
-export function ScratchpadPanel() {
-  const storedContent = useSyncExternalStore(subscribe, getSnapshot, () => DEFAULT_TEXT);
-  const [localContent, setLocalContent] = useState("");
-  const [isEditing, setIsEditing] = useState(false);
+export function ScratchpadPanel({
+  initialContent,
+  signedIn,
+}: {
+  initialContent: string;
+  signedIn: boolean;
+}) {
+  const [content, setContent] = useState(initialContent);
+  const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">(
+    "idle",
+  );
   const [copied, setCopied] = useState(false);
+  const savedRef = useRef(initialContent);
 
-  const content = isEditing ? localContent : storedContent;
-
-  function handleChange(val: string) {
-    setIsEditing(true);
-    setLocalContent(val);
-    try {
-      localStorage.setItem(STORAGE_KEY, val);
-    } catch {
-      // storage error
+  useEffect(() => {
+    if (!signedIn || content === savedRef.current) {
+      return;
     }
-  }
+
+    const handle = window.setTimeout(() => {
+      const snapshot = content;
+      setStatus("saving");
+      void saveScratchpadAction(snapshot)
+        .then((result) => {
+          if (!result.ok) {
+            setStatus("error");
+            return;
+          }
+          savedRef.current = snapshot;
+          setStatus("saved");
+        })
+        .catch(() => setStatus("error"));
+    }, 500);
+
+    return () => window.clearTimeout(handle);
+  }, [content, signedIn]);
 
   async function handleCopy() {
     try {
@@ -51,18 +50,27 @@ export function ScratchpadPanel() {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
-      // clipboard error
+      toast.error("Could not copy the scratchpad");
     }
   }
 
   function handleClear() {
-    setIsEditing(true);
-    setLocalContent("");
-    try {
-      localStorage.removeItem(STORAGE_KEY);
-    } catch {
-      // error
+    setContent("");
+  }
+
+  async function handlePin() {
+    const result = await toggleBookmarkAction({
+      url: SCRATCHPAD_URL,
+      title: "Scratchpad",
+      summary: content,
+    });
+    if (result.error) {
+      toast.error(result.error);
+      return;
     }
+    toast.success(
+      result.bookmarked ? "Scratchpad pinned to bookmarks" : "Removed from bookmarks",
+    );
   }
 
   return (
@@ -73,14 +81,31 @@ export function ScratchpadPanel() {
             Scratchpad
           </span>
           <span className="font-mono text-xs text-zinc-400">
-            Local browser storage
+            {signedIn
+              ? status === "saving"
+                ? "Saving…"
+                : status === "saved"
+                  ? "Saved to your library"
+                  : status === "error"
+                    ? "Save failed"
+                    : "Saved to your library"
+              : "Sign in to save"}
           </span>
         </div>
 
         <div className="flex items-center gap-1.5 font-mono text-xs">
+          {signedIn ? (
+            <button
+              type="button"
+              onClick={() => void handlePin()}
+              className="flex h-7 items-center rounded-md px-2 text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+            >
+              Pin
+            </button>
+          ) : null}
           <button
             type="button"
-            onClick={handleCopy}
+            onClick={() => void handleCopy()}
             className="flex h-7 items-center gap-1.5 rounded-md px-2 text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
           >
             {copied ? (
@@ -93,7 +118,8 @@ export function ScratchpadPanel() {
           <button
             type="button"
             onClick={handleClear}
-            className="flex size-7 items-center justify-center rounded-md text-zinc-400 hover:bg-zinc-800 hover:text-red-400 transition-colors"
+            disabled={!signedIn}
+            className="flex size-7 items-center justify-center rounded-md text-zinc-400 hover:bg-zinc-800 hover:text-red-400 transition-colors disabled:opacity-40"
             title="Clear Scratchpad"
           >
             <Trash2 className="size-3.5" />
@@ -104,10 +130,15 @@ export function ScratchpadPanel() {
       <div className="rounded-lg border border-zinc-800/80 bg-zinc-900/40 p-3.5 focus-within:border-zinc-700 transition-colors">
         <textarea
           value={content}
-          onChange={(e) => handleChange(e.target.value)}
-          placeholder="Jot markdown notes, paste URLs, or store temporary snippets..."
+          onChange={(event) => setContent(event.target.value)}
+          disabled={!signedIn}
+          placeholder={
+            signedIn
+              ? "Jot markdown notes, paste URLs, or store temporary snippets..."
+              : "Sign in to keep a scratchpad in your library."
+          }
           rows={7}
-          className="w-full resize-y bg-transparent font-mono text-sm leading-relaxed text-zinc-200 placeholder:text-zinc-500 focus:outline-hidden"
+          className="w-full resize-y bg-transparent font-mono text-sm leading-relaxed text-zinc-200 placeholder:text-zinc-500 focus:outline-hidden disabled:cursor-not-allowed"
           spellCheck={false}
         />
         <div className="flex items-center justify-between pt-2 border-t border-zinc-800/60 font-mono text-xs text-zinc-400">

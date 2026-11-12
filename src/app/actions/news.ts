@@ -53,6 +53,7 @@ export async function refreshNewsFeedAction(
 
     const result = await refreshTechNewsFeed();
     revalidatePath("/news");
+    revalidatePath("/");
 
     const warning =
       result.errors.length > 0
@@ -79,6 +80,7 @@ export async function toggleMustLearnAction(id: string, next: boolean) {
 
   await setMustLearn(id, next);
   revalidatePath("/news");
+  revalidatePath("/");
 }
 
 export async function persistNewsSummaryAction(id: string, summary: string) {
@@ -95,4 +97,5 @@ export async function persistNewsSummaryAction(id: string, summary: string) {
 
   await saveNewsSummary(id, trimmed);
   revalidatePath("/news");
+  revalidatePath("/");
 }

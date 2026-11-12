@@ -92,8 +92,31 @@ export async function createVaultVideo(userId: string, rawUrl: string) {
   }
 
   const url = youtubeWatchUrl(videoId);
-  const title = (await fetchYouTubeTitle(videoId)) ?? `YouTube ${videoId}`;
+  const fetchedTitle = await fetchYouTubeTitle(videoId);
+  const title = fetchedTitle ?? `YouTube ${videoId}`;
   const db = getDb();
+
+  const [existing] = await db
+    .select({ id: resources.id, title: resources.title })
+    .from(resources)
+    .where(and(eq(resources.userId, userId), eq(resources.url, url)))
+    .limit(1);
+
+  if (existing) {
+    await db
+      .update(resources)
+      .set({
+        lastOpenedAt: new Date(),
+        ...(fetchedTitle ? { title: fetchedTitle } : {}),
+      })
+      .where(and(eq(resources.id, existing.id), eq(resources.userId, userId)));
+
+    const reopened = await getVaultVideo(userId, existing.id);
+    if (!reopened) {
+      throw new Error("Video not found.");
+    }
+    return reopened;
+  }
 
   const [resource] = await db
     .insert(resources)
@@ -104,6 +127,7 @@ export async function createVaultVideo(userId: string, rawUrl: string) {
       title,
       domain: "youtube.com",
       status: "TO_READ",
+      lastOpenedAt: new Date(),
     })
     .returning();
 
@@ -205,6 +229,11 @@ export async function saveVaultNote(
       })
       .where(eq(notes.id, existing.id))
       .returning();
+
+    await getDb()
+      .update(resources)
+      .set({ lastOpenedAt: new Date() })
+      .where(and(eq(resources.id, resourceId), eq(resources.userId, userId)));
 
     return updated;
   }

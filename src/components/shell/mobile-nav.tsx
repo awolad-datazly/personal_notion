@@ -13,7 +13,13 @@ import {
 } from "@/components/ui/sheet";
 import type { NavItem } from "@/config/navigation";
 
-export function MobileNav({ items }: { items: NavItem[] }) {
+export function MobileNav({
+  items,
+  bookmarkCount = 0,
+}: {
+  items: NavItem[];
+  bookmarkCount?: number;
+}) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -33,7 +39,11 @@ export function MobileNav({ items }: { items: NavItem[] }) {
             Navigation
           </SheetTitle>
         </SheetHeader>
-        <SidebarNav items={items} onNavigate={() => setOpen(false)} />
+        <SidebarNav
+          items={items}
+          bookmarkCount={bookmarkCount}
+          onNavigate={() => setOpen(false)}
+        />
       </SheetContent>
     </Sheet>
   );

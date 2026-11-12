@@ -15,6 +15,13 @@
       "when": 1793506918614,
       "tag": "0001_neat_madelyne_pryor",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794496391128,
+      "tag": "0002_closed_bucky",
+      "breakpoints": true
     }
   ]
 }

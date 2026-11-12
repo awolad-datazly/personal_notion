@@ -13,10 +13,10 @@ export function VaultList({ items }: { items: VaultItem[] }) {
     return (
       <div className="rounded-lg border border-dashed border-zinc-800 p-12 text-center space-y-2">
         <p className="font-mono text-sm font-semibold text-zinc-200">
-          Nothing saved in the vault yet. Either you already know everything, or you&apos;re procrastinating.
+          No videos in your vault yet.
         </p>
         <p className="font-mono text-xs text-zinc-400">
-          Paste a YouTube tutorial or engineering talk in the input bar above to begin a session.
+          Paste a YouTube link above. It is saved to your library.
         </p>
       </div>
     );

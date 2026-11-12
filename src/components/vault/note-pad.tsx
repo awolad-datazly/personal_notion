@@ -12,7 +12,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/toast";
 import type { NoteTimestamp } from "@/db/schema";
-import { getStudySessions, saveStudySession } from "@/lib/study-storage";
 import { formatTimestamp, parseTimestampToken } from "@/lib/youtube";
 
 function sortTimestamps(items: NoteTimestamp[]) {
@@ -28,8 +27,6 @@ function markdownForPreview(content: string) {
 
 export function NotePad({
   resourceId,
-  videoId,
-  videoTitle,
   initialContent = "",
   initialTimestamps = [],
   updatedAt = null,
@@ -43,22 +40,14 @@ export function NotePad({
 }) {
   const { apiRef } = useVaultPlayer();
 
-  // Check if we have an existing local session for this video
-  const localSession = useMemo(() => {
-    if (!videoId) return null;
-    return getStudySessions().find((s) => s.videoId === videoId) ?? null;
-  }, [videoId]);
-
-  const [content, setContent] = useState(
-    () => initialContent || localSession?.notes || "",
-  );
+  const [content, setContent] = useState(initialContent);
   const [timestamps, setTimestamps] = useState<NoteTimestamp[]>(() => {
     if (initialTimestamps && initialTimestamps.length > 0) {
       return sortTimestamps(initialTimestamps);
     }
     return [];
   });
-  const [savedAt, setSavedAt] = useState(updatedAt || localSession?.updatedAt || null);
+  const [savedAt, setSavedAt] = useState(updatedAt);
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">(
     "idle",
   );
@@ -110,45 +99,29 @@ export function NotePad({
     }
 
     const handle = window.setTimeout(() => {
-      // 1. Sync to local storage for instant reactive updates in Continue Studying
-      if (videoId) {
-        const lastPos =
-          timestamps.length > 0
-            ? timestamps[timestamps.length - 1].label || "00:00"
-            : "00:00";
-        saveStudySession({
-          videoId,
-          title: videoTitle || "YouTube Study Session",
-          notes: content,
-          timestampsCount: timestamps.length,
-          lastPosition: lastPos,
-        });
+      if (!resourceId) {
+        setStatus("error");
+        return;
       }
 
-      // 2. Sync to DB if resourceId is given
-      if (resourceId && !resourceId.startsWith("local-")) {
-        startTransition(async () => {
-          try {
-            setStatus("saving");
-            const result = await saveVaultNoteAction({
-              resourceId,
-              content,
-              timestamps,
-            });
-            setSavedAt(result.updatedAt);
-            setStatus("saved");
-          } catch {
-            setStatus("error");
-          }
-        });
-      } else {
-        setSavedAt(new Date().toISOString());
-        setStatus("saved");
-      }
+      startTransition(async () => {
+        try {
+          setStatus("saving");
+          const result = await saveVaultNoteAction({
+            resourceId,
+            content,
+            timestamps,
+          });
+          setSavedAt(result.updatedAt);
+          setStatus("saved");
+        } catch {
+          setStatus("error");
+        }
+      });
     }, 700);
 
     return () => window.clearTimeout(handle);
-  }, [content, resourceId, timestamps, videoId, videoTitle]);
+  }, [content, resourceId, timestamps]);
 
   return (
     <div className="flex h-full min-h-0 flex-col rounded-lg border border-zinc-800/80 bg-zinc-900/40">

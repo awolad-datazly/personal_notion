@@ -3,24 +3,22 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import { useSyncExternalStore } from "react";
 import { NAV_ICONS } from "@/components/shell/nav-icons";
 import type { NavItem, NavSection } from "@/config/navigation";
-import { getBookmarks } from "@/lib/bookmarks-storage";
-import { subscribeToStorage } from "@/lib/storage-bus";
 import { cn } from "@/lib/utils";
 
 const SECTIONS: NavSection[] = ["WORKSPACE", "LIBRARY", "SYSTEM"];
 
 export function SidebarNav({
   items,
+  bookmarkCount = 0,
   onNavigate,
 }: {
   items: NavItem[];
+  bookmarkCount?: number;
   onNavigate?: () => void;
 }) {
   const pathname = usePathname();
-  const bookmarkCount = useSyncExternalStore(subscribeToStorage, () => getBookmarks().length, () => 4);
 
   return (
     <nav className="flex flex-col gap-4 px-3 py-3">

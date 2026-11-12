@@ -106,7 +106,7 @@ export async function AccountSettingsCard() {
                 </span>
               </div>
               <p className="mt-1 font-mono text-xs text-zinc-400">
-                Bookmarks and scratchpad notes are preserved locally in browser storage.
+                Sign in to save videos, articles, bookmarks, and your scratchpad.
               </p>
             </div>
 

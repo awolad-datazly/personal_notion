@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --import ./scripts/register-ts-tests.mjs --test src/lib/youtube.test.ts src/lib/library/ownership.test.ts src/lib/library/urls.test.ts src/lib/library/present.test.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",

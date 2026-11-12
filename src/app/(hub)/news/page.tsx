@@ -10,54 +10,6 @@ import type { TechNewsItem } from "@/db/schema";
 import { isFeatureEnabled } from "@/lib/feature-flags";
 import { listTechNews } from "@/lib/news/data";
 
-const FALLBACK_NEWS_ITEMS: TechNewsItem[] = [
-  {
-    id: "hn-1",
-    title: "SQLite in 2026: Fast, Robust, and Now Supporting Vector Indexes",
-    url: "https://news.ycombinator.com",
-    category: "Databases",
-    summary: "Native diskANN integration enables millisecond vector similarity queries without Postgres extensions.",
-    isMustLearn: true,
-    createdAt: new Date(),
-  },
-  {
-    id: "gh-2",
-    title: "Rust 2026 Edition: Async Closures and Ergonomic Lifetime Simplification",
-    url: "https://github.com",
-    category: "Rust / Systems",
-    summary: "Major improvements in borrow checker diagnostics and native async trait stabilization.",
-    isMustLearn: true,
-    createdAt: new Date(),
-  },
-  {
-    id: "dev-3",
-    title: "Building Zero-Latency Offline-First Workspaces with CRDTs",
-    url: "https://dev.to",
-    category: "Architecture",
-    summary: "How Yjs and local IndexedDB caching yield instant 60fps desktop UX without cloud roundtrips.",
-    isMustLearn: false,
-    createdAt: new Date(),
-  },
-  {
-    id: "ai-4",
-    title: "Gemini 2.5 Flash Thinking: Sub-Second Reasoning at 10x Lower Token Costs",
-    url: "https://ai.google.dev",
-    category: "AI / LLM",
-    summary: "Chain-of-thought distillation enables complex code analysis directly in browser dev tools.",
-    isMustLearn: true,
-    createdAt: new Date(),
-  },
-  {
-    id: "v8-5",
-    title: "Inside the V8 Engine: Hidden Classes, Inline Caches & TurboFan Optimizations",
-    url: "https://v8.dev/blog",
-    category: "Engineering",
-    summary: "Why monomorphic call sites run 5x faster in high-throughput Node.js microservices.",
-    isMustLearn: false,
-    createdAt: new Date(),
-  },
-];
-
 function NewsFeedSkeleton() {
   return (
     <div className="rounded-lg border border-zinc-800/80 bg-zinc-900/30 p-4 space-y-3 animate-pulse">
@@ -89,8 +41,6 @@ async function DynamicNewsContent() {
     }
   }
 
-  const displayItems = items.length > 0 ? items : FALLBACK_NEWS_ITEMS;
-
   return (
     <div className="flex flex-col gap-6">
       {/* Top Utility Row */}
@@ -105,7 +55,7 @@ async function DynamicNewsContent() {
         {/* Left 8 Columns: Live Tech Signal Feed */}
         <section className="lg:col-span-8">
           <NewsFeed
-            items={displayItems}
+            items={items}
             canManageMustLearn={canManageMustLearn}
             canSummarize={canSummarize}
           />
@@ -113,7 +63,7 @@ async function DynamicNewsContent() {
 
         {/* Right 4 Columns: Tech to Learn Radar */}
         <section className="lg:col-span-4">
-          <TechRadarPanel />
+          <TechRadarPanel items={items} />
         </section>
       </div>
     </div>

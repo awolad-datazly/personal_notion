@@ -13,10 +13,13 @@ import {
   Type,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
-import { isBookmarked, toggleBookmark } from "@/lib/bookmarks-storage";
+import { useCallback, useEffect, useState } from "react";
+
+import {
+  lookupBookmarkAction,
+  toggleBookmarkAction,
+} from "@/app/actions/library";
 import { readGeminiKey } from "@/lib/gemini-key";
-import { subscribeToStorage } from "@/lib/storage-bus";
 import { toast } from "@/components/ui/toast";
 
 function GithubIcon({ className = "size-4" }: { className?: string }) {
@@ -93,16 +96,29 @@ export function ArticleReaderDrawer() {
   const [fontSerif, setFontSerif] = useState(false);
   const [tldr, setTldr] = useState<string | null>(null);
   const [tldrLoading, setTldrLoading] = useState(false);
+  const [bookmarked, setBookmarked] = useState(false);
 
-  const isBookmarkedCurrent = useSyncExternalStore(
-    subscribeToStorage,
-    () => (article?.url ? isBookmarked(article.url) : false),
-    () => false,
-  );
+  useEffect(() => {
+    if (!article?.url) {
+      return;
+    }
+
+    let ignore = false;
+    void lookupBookmarkAction(article.url).then((value) => {
+      if (!ignore) {
+        setBookmarked(value);
+      }
+    });
+
+    return () => {
+      ignore = true;
+    };
+  }, [article?.url]);
 
   const handleClose = useCallback(() => {
     setOpen(false);
     setArticle(null);
+    setBookmarked(false);
     setTldr(null);
     if (typeof window !== "undefined" && window.getSelection) {
       window.getSelection()?.removeAllRanges();
@@ -117,6 +133,7 @@ export function ArticleReaderDrawer() {
 
       setOpen(true);
       setLoading(true);
+      setBookmarked(false);
       setTldr(null);
 
       try {
@@ -233,24 +250,21 @@ export function ArticleReaderDrawer() {
     }
   }
 
-  function handleToggleBookmark() {
+  async function handleToggleBookmark() {
     if (!article) return;
-    const next = toggleBookmark({
-      id: article.url,
-      title: article.title,
+    const result = await toggleBookmarkAction({
       url: article.url,
-      source:
-        article.sourceType === "github"
-          ? "GitHub"
-          : article.sourceType === "hackernews"
-            ? "Hacker News"
-            : article.sourceType === "devto"
-              ? "Dev.to"
-              : article.domain,
+      title: article.title,
       summary: article.summary,
-      tags: article.tags,
     });
-    toast.success(next ? "Saved to Bookmarks" : "Removed from Bookmarks");
+    if (result.error || result.bookmarked === undefined) {
+      toast.error(result.error ?? "Could not update that bookmark");
+      return;
+    }
+    setBookmarked(result.bookmarked);
+    toast.success(
+      result.bookmarked ? "Saved to Bookmarks" : "Removed from Bookmarks",
+    );
   }
 
   if (!open) return null;
@@ -300,13 +314,13 @@ export function ArticleReaderDrawer() {
               type="button"
               onClick={handleToggleBookmark}
               className={`flex size-8 items-center justify-center rounded-md border border-zinc-800 bg-zinc-900 transition-colors ${
-                isBookmarkedCurrent
+                bookmarked
                   ? "text-amber-400 border-amber-500/40"
                   : "text-zinc-400 hover:text-white"
               }`}
-              title={isBookmarkedCurrent ? "Remove Bookmark" : "Save Bookmark"}
+              title={bookmarked ? "Remove Bookmark" : "Save Bookmark"}
             >
-              <Bookmark className={`size-3.5 ${isBookmarkedCurrent ? "fill-current" : ""}`} />
+              <Bookmark className={`size-3.5 ${bookmarked ? "fill-current" : ""}`} />
             </button>
 
             <button
